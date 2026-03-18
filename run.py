@@ -5,10 +5,11 @@ Multi-Agent AI System with Web Configuration UI
 This file has been refactored to use modular components from outo/server/
 """
 
-import os
 import sys
+import threading
+from importlib import import_module
 from pathlib import Path
-from datetime import datetime
+from typing import Any, cast
 
 OUTOBOT_DIR = Path.home() / ".outobot"
 CONFIG_DIR = OUTOBOT_DIR / "config"
@@ -20,7 +21,6 @@ SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -30,12 +30,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 from outo import (
     ProviderManager,
     AgentManager,
-    DEFAULT_PROVIDERS,
-    DEFAULT_AGENTS,
-    AGENT_ROLES,
-    DEFAULT_TOOLS,
 )
-from outo.skills import SkillsManager, get_skills_manager, AGENT_SKILL_PATHS
+
+get_skills_manager = import_module("outo.skills").get_skills_manager
 
 
 # Import route creators from the new modular structure
@@ -43,19 +40,104 @@ from outo.server.routes import static, providers, skills, agents, sessions, chat
 
 
 # Global manager instances
-provider_manager = None
-skills_manager = None
-agent_manager = None
+provider_manager: ProviderManager | None = None
+skills_manager: Any = None
+agent_manager: AgentManager | None = None
+
+
+def _get_skills_sync_config(manager: Any) -> dict[str, Any]:
+    get_sync_config = getattr(manager, "get_sync_config", None)
+    if not callable(get_sync_config):
+        return {}
+
+    try:
+        sync_config = get_sync_config() or {}
+    except Exception as exc:
+        print(f"Skills sync: failed to load sync config: {exc}")
+        return {}
+
+    return sync_config if isinstance(sync_config, dict) else {}
+
+
+def _is_periodic_sync_enabled(sync_config: dict[str, Any]) -> bool:
+    return bool(sync_config.get("enabled", False))
+
+
+def _get_periodic_sync_interval(sync_config: dict[str, Any]) -> Any | None:
+    return sync_config.get("interval_minutes")
+
+
+def _run_skills_startup_sync(
+    manager: Any, sync_config: dict[str, Any], shutdown_event: threading.Event
+) -> None:
+    sync_on_startup = bool(sync_config.get("sync_on_startup"))
+    periodic_sync_enabled = _is_periodic_sync_enabled(sync_config)
+
+    if sync_on_startup:
+        sync_from_agents = getattr(manager, "sync_from_agents", None)
+        if callable(sync_from_agents):
+            print("Skills sync: syncing skills on startup")
+            try:
+                result = sync_from_agents()
+                print(f"Skills sync: startup sync complete: {result}")
+            except Exception as exc:
+                print(f"Skills sync: startup sync failed: {exc}")
+
+    if shutdown_event.is_set() or not periodic_sync_enabled:
+        return
+
+    start_periodic_sync = getattr(manager, "start_periodic_sync", None)
+    if not callable(start_periodic_sync):
+        return
+
+    interval = _get_periodic_sync_interval(sync_config)
+    interval_text = f" every {interval} minutes" if interval else ""
+    print(f"Skills sync: starting periodic sync{interval_text}")
+    try:
+        _ = start_periodic_sync()
+    except Exception as exc:
+        print(f"Skills sync: failed to start periodic sync: {exc}")
+
+
+def _start_skills_sync_thread(app: FastAPI) -> None:
+    sync_config = cast(dict[str, Any], app.state.skills_sync_config)
+    if not sync_config:
+        return
+
+    shutdown_event = cast(threading.Event, app.state.skills_sync_shutdown)
+    shutdown_event.clear()
+
+    sync_thread = threading.Thread(
+        target=_run_skills_startup_sync,
+        args=(app.state.skills_manager, sync_config, shutdown_event),
+        name="skills-startup-sync",
+        daemon=True,
+    )
+    app.state.skills_sync_thread = sync_thread
+    sync_thread.start()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global agent_manager
+    if provider_manager is None:
+        raise RuntimeError("Provider manager is not initialized")
+
     agent_manager = AgentManager(
         provider_manager.providers, provider_manager.get_config()
     )
     app.state.agent_manager = agent_manager
+    _start_skills_sync_thread(app)
     yield
+
+    app.state.skills_sync_shutdown.set()
+    stop_periodic_sync = getattr(app.state.skills_manager, "stop_periodic_sync", None)
+    if callable(stop_periodic_sync):
+        print("Skills sync: stopping periodic sync")
+        try:
+            _ = stop_periodic_sync()
+        except Exception as exc:
+            print(f"Skills sync: failed to stop periodic sync: {exc}")
 
 
 def create_app() -> FastAPI:
@@ -66,6 +148,7 @@ def create_app() -> FastAPI:
     provider_manager = ProviderManager(CONFIG_DIR)
     skills_manager = get_skills_manager(Path(__file__).parent / "skills")
     agent_manager = None  # Will be created in lifespan
+    skills_sync_config = _get_skills_sync_config(skills_manager)
 
     app = FastAPI(title="OutO - Multi-Agent AI System", lifespan=lifespan)
 
@@ -85,6 +168,9 @@ def create_app() -> FastAPI:
     # Store managers in app state for access by routes
     app.state.provider_manager = provider_manager
     app.state.skills_manager = skills_manager
+    app.state.skills_sync_config = skills_sync_config
+    app.state.skills_sync_shutdown = threading.Event()
+    app.state.skills_sync_thread = None
     app.state.sessions_dir = SESSIONS_DIR
     app.state.upload_dir = UPLOAD_DIR
     app.state.static_dir = static_dir

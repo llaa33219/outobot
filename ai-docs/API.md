@@ -117,6 +117,10 @@ Manage agent skills.
 | `/api/skills` | GET | List all installed skills |
 | `/api/skills/sync` | POST | Sync skills from AI agent tools |
 | `/api/skills/install` | POST | Install skill from npm |
+| `/api/skills/config` | GET | Get auto-sync configuration |
+| `/api/skills/config` | POST | Update auto-sync configuration |
+| `/api/skills/sync-one` | POST | Sync a single skill source |
+| `/api/skills/stats` | GET | Get skill synchronization statistics |
 
 #### GET /api/skills
 
@@ -169,6 +173,91 @@ Install skill from npm.
 {
   "message": "Skill installed successfully",
   "sync": {"added": 1, "removed": 0, "updated": 0}
+}
+```
+
+#### GET /api/skills/config
+
+Retrieve the current auto-sync configuration.
+
+**Response:**
+```json
+{
+  "enabled": true,
+  "interval_minutes": 60,
+  "sync_on_startup": true,
+  "sources": {
+    "claude-code": true,
+    "cursor": true,
+    "windsurf": true,
+    "gemini": true,
+    "opencode": true,
+    "copilot": true,
+    "agents": true
+  },
+  "last_sync": "2026-03-18T10:00:00"
+}
+```
+
+#### POST /api/skills/config
+
+Update the auto-sync configuration.
+
+**Request Body:**
+```json
+{
+  "enabled": true,
+  "interval_minutes": 30,
+  "sync_on_startup": false
+}
+```
+
+**Response:**
+```json
+{
+  "status": "updated",
+  "config": {
+    "enabled": true,
+    "interval_minutes": 30,
+    "sync_on_startup": false,
+    "sources": { ... },
+    "last_sync": "2026-03-18T10:00:00"
+  }
+}
+```
+
+#### POST /api/skills/sync-one
+
+Manually trigger synchronization for a single skill source.
+
+**Request Body:**
+```json
+{
+  "source": "claude-code"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "Synced source: claude-code",
+  "result": {"added": 1, "removed": 0, "updated": 0}
+}
+```
+
+#### GET /api/skills/stats
+
+Get statistics about skill synchronization.
+
+**Response:**
+```json
+{
+  "total_skills": 15,
+  "last_sync_all": "2026-03-18T10:00:00",
+  "source_stats": {
+    "claude-code": {"count": 5, "last_sync": "2026-03-18T10:00:00"},
+    "cursor": {"count": 3, "last_sync": "2026-03-18T10:00:00"}
+  }
 }
 ```
 

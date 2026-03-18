@@ -165,6 +165,47 @@ Skills metadata stored in `~/.outobot/skills/_skills.json`:
 }
 ```
 
+## Auto-Sync
+
+The auto-sync feature automatically keeps your skills up to date with their original sources. Configuration is stored in `~/.outobot/config/skills_config.json`.
+
+### Configuration Options
+
+- `enabled`: Global flag to enable or disable auto-sync.
+- `interval_minutes`: Frequency of periodic sync checks.
+- `sync_on_startup`: Whether to perform a full sync when the system starts.
+- `sources`: Per-source enable/disable settings for each agent tool.
+- `last_sync`: Timestamp tracking for the last successful synchronization.
+
+### Example Configuration
+
+```json
+{
+  "enabled": true,
+  "interval_minutes": 60,
+  "sync_on_startup": true,
+  "sources": {
+    "claude-code": true,
+    "cursor": true,
+    "windsurf": true,
+    "gemini": true,
+    "opencode": true,
+    "copilot": true,
+    "agents": true
+  },
+  "last_sync": "2026-03-18T10:00:00"
+}
+```
+
+### When Auto-Sync Runs
+
+- **Startup Sync**: If `sync_on_startup` is true, a full synchronization process initiates immediately when the OutO server starts.
+- **Periodic Sync**: While the server is running, it checks for updates every `interval_minutes` if `enabled` is set to true.
+
+### Configuring Auto-Sync
+
+Settings can be modified through the API using the `/api/skills/config` endpoints. Changes take effect immediately without requiring a server restart.
+
 ## API Endpoints
 
 ### GET /api/skills

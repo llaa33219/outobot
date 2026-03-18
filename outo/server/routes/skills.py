@@ -2,6 +2,8 @@
 OutO Server Routes - Skills management endpoints
 """
 
+# pyright: reportMissingImports=false
+
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
@@ -39,9 +41,60 @@ def create_skills_routes(app, skills_manager):
             "total_skills": len(skills),
         }
 
+    @router.get("/api/skills/config")
+    async def get_sync_config():
+        try:
+            return skills_manager.load_config()
+        except Exception as e:
+            return JSONResponse({"detail": str(e)}, status_code=500)
+
+    @router.post("/api/skills/config")
+    async def save_sync_config(config: dict[str, object]):
+        try:
+            current_config = skills_manager.load_config()
+            was_enabled = bool(current_config.get("enabled"))
+
+            skills_manager.save_config(config)
+            updated_config = skills_manager.load_config()
+            is_enabled = bool(updated_config.get("enabled"))
+
+            if is_enabled:
+                if was_enabled:
+                    skills_manager.stop_periodic_sync()
+                skills_manager.start_periodic_sync()
+            elif was_enabled:
+                skills_manager.stop_periodic_sync()
+
+            return {"status": "updated", "config": updated_config}
+        except Exception as e:
+            return JSONResponse({"detail": str(e)}, status_code=500)
+
+    @router.post("/api/skills/sync-one")
+    async def sync_one_source(request: dict[str, object]):
+        source = str(request.get("source", "")).strip()
+
+        if not source:
+            return JSONResponse({"detail": "No source provided"}, status_code=400)
+
+        try:
+            result = skills_manager.sync_from_agents(sources=[source])
+            return {
+                "message": f"Synced source: {source}",
+                "result": result,
+            }
+        except Exception as e:
+            return JSONResponse({"detail": str(e)}, status_code=500)
+
+    @router.get("/api/skills/stats")
+    async def get_sync_stats():
+        try:
+            return skills_manager.sync_stats()
+        except Exception as e:
+            return JSONResponse({"detail": str(e)}, status_code=500)
+
     @router.post("/api/skills/install")
-    async def install_skill(request: dict):
-        command = request.get("command", "").strip()
+    async def install_skill(request: dict[str, object]):
+        command = str(request.get("command", "")).strip()
 
         if not command:
             return JSONResponse({"detail": "No command provided"}, status_code=400)
