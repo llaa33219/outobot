@@ -1,0 +1,46 @@
+{
+  "version": "1.0.0",
+  "skills": [
+    {
+      "name": "remotion",
+      "description": "Best practices for Remotion - Video creation in React",
+      "agents": [],
+      "enabled": true,
+      "file": "remotion/SKILL.md",
+      "sources": [
+        "claude-code"
+      ]
+    },
+    {
+      "name": "agent-browser",
+      "description": "Browser automation CLI for AI agents. Use when the user needs to interact with websites, including navigating pages, filling forms, clicking buttons, taking screenshots, extracting data, testing web apps, or automating any browser task. Triggers include requests to \"open a website\", \"fill out a form\", \"click a button\", \"take a screenshot\", \"scrape data from a page\", \"test this web app\", \"login to a site\", \"automate browser actions\", or any task requiring programmatic web interaction.",
+      "agents": [],
+      "enabled": true,
+      "file": "agent-browser/SKILL.md",
+      "sources": [
+        "agents"
+      ]
+    },
+    {
+      "name": "find-skills",
+      "description": "Helps users discover and install agent skills when they ask questions like \"how do I do X\", \"find a skill for X\", \"is there a skill that can...\", or express interest in extending capabilities. This skill should be used when the user is looking for functionality that might exist as an installable skill.",
+      "agents": [],
+      "enabled": true,
+      "file": "find-skills/SKILL.md",
+      "sources": [
+        "agents"
+      ]
+    },
+    {
+      "name": "blender",
+      "description": "Blender interface, workflows, and 3D production pipeline",
+      "agents": [],
+      "enabled": true,
+      "file": "blender/SKILL.md",
+      "sources": [
+        "agents"
+      ]
+    }
+  ],
+  "sources": []
+}
