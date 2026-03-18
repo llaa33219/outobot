@@ -1,8 +1,8 @@
-# ChatOutO Style Integration - OutO Frontend
+# ChatOutObot Style Integration - OutObot Frontend
 
 ## Overview
 
-This document describes the frontend style changes applied to OutO, integrating the Neo-brutalist design system from [chatouto](https://github.com/llaa33219/chatouto).
+This document describes the frontend style changes applied to OutObot, integrating the Neo-brutalist design system from [chatouto](https://github.com/llaa33219/chatouto).
 
 ## Changes Made
 
@@ -45,7 +45,7 @@ This document describes the frontend style changes applied to OutO, integrating 
 ## Components
 
 ### Header
-- Logo with OutO branding
+- Logo with OutObot branding
 - Version badge
 - Agent bar (for delegation visualization)
 - Connection status indicator

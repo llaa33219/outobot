@@ -1,5 +1,5 @@
 """
-OutO Server Routes - Chat endpoints (streaming, regular, websocket)
+OutObot Server Routes - Chat endpoints (streaming, regular, websocket)
 """
 
 import json

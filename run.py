@@ -1,5 +1,5 @@
 """
-OutO Server - Main Entry Point
+OutObot Server - Main Entry Point
 Multi-Agent AI System with Web Configuration UI
 
 This file has been refactored to use modular components from outo/server/
@@ -150,7 +150,7 @@ def create_app() -> FastAPI:
     agent_manager = None  # Will be created in lifespan
     skills_sync_config = _get_skills_sync_config(skills_manager)
 
-    app = FastAPI(title="OutO - Multi-Agent AI System", lifespan=lifespan)
+    app = FastAPI(title="OutObot - Multi-Agent AI System", lifespan=lifespan)
 
     # Add CORS middleware
     app.add_middleware(
@@ -210,5 +210,5 @@ app = create_app()
 if __name__ == "__main__":
     import uvicorn
 
-    print("Starting OutO server on http://localhost:7227")
+    print("Starting OutObot server on http://localhost:7227")
     uvicorn.run(app, host="localhost", port=7227)

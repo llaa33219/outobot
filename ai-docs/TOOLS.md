@@ -1,10 +1,10 @@
-# OutO Tools System
+# OutObot Tools System
 
 Documentation for the default tools available to all agents.
 
 ## Overview
 
-All OutO agents have access to a set of default tools for interacting with the filesystem, running commands, and searching for information.
+All OutObot agents have access to a set of default tools for interacting with the filesystem, running commands, and searching for information.
 
 ## Available Tools
 

@@ -1,5 +1,5 @@
 """
-OutO Provider Management
+OutObot Provider Management
 Supports MiniMax, GLM, GLM Coding Plan, Kimi (Moonshot AI)
 """
 

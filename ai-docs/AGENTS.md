@@ -1,16 +1,16 @@
-# OutO Agent System
+# OutObot Agent System
 
-Detailed documentation for OutO's multi-agent system.
+Detailed documentation for OutObot's multi-agent system.
 
 ## Overview
 
-OutO uses a multi-agent architecture where specialized agents collaborate to complete tasks. The coordinator agent (OutO) delegates to other agents based on their expertise.
+OutObot uses a multi-agent architecture where specialized agents collaborate to complete tasks. The coordinator agent (OutObot) delegates to other agents based on their expertise.
 
 ## Agent Roles
 
 | Agent | Role | Description |
 |-------|------|-------------|
-| **OutO** | Coordinator | Main orchestrator - delegates tasks to appropriate agents |
+| **OutObot** | Coordinator | Main orchestrator - delegates tasks to appropriate agents |
 | **Peritus** | Professional | General professional work - handles diverse tasks with expertise |
 | **Inquisitor** | Research | Research and investigation specialist |
 | **Rimor** | Explorer | Precise and fast exploration - finds information quickly |
@@ -120,7 +120,7 @@ Each agent has a specific temperature setting that controls randomness in output
 
 Each agent has specific instructions embedded:
 
-### OutO (Coordinator)
+### OutObot (Coordinator)
 
 ```
 You are the main coordinator agent. Your role is to:
@@ -264,10 +264,10 @@ Skills are stored in ~/.outobot/skills/ directory. Each skill has a SKILL.md fil
 Agents can delegate tasks to other agents. The delegation flow:
 
 ```
-User → OutO → (delegates to) → Inquisitor → (research)
+User → OutObot → (delegates to) → Inquisitor → (research)
                             → Recensor → (review)
                             → Creativus → (ideas)
-                            → OutO → User
+                            → OutObot → User
 ```
 
 ## Adding Custom Agents

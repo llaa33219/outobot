@@ -1,10 +1,10 @@
-# OutO Session Management
+# OutObot Session Management
 
-Documentation for chat session management in OutO.
+Documentation for chat session management in OutObot.
 
 ## Overview
 
-OutO maintains persistent chat sessions that allow users to continue conversations across multiple interactions. Sessions are automatically saved and can be loaded to restore context.
+OutObot maintains persistent chat sessions that allow users to continue conversations across multiple interactions. Sessions are automatically saved and can be loaded to restore context.
 
 ## Session Storage
 

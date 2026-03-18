@@ -1,5 +1,5 @@
 """
-OutO Server Routes - Provider management endpoints
+OutObot Server Routes - Provider management endpoints
 """
 
 from fastapi import APIRouter, HTTPException, Request

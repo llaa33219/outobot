@@ -1,5 +1,5 @@
 """
-OutO Server Routes - Agents endpoints
+OutObot Server Routes - Agents endpoints
 """
 
 from fastapi import APIRouter, Request

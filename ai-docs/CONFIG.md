@@ -1,6 +1,6 @@
-# OutO Configuration
+# OutObot Configuration
 
-Documentation for configuration files in OutO.
+Documentation for configuration files in OutObot.
 
 ## Configuration Directory
 
@@ -165,7 +165,7 @@ Location: `~/.outobot/config/config.yaml`
 Sample configuration file (reference only - actual config via web UI):
 
 ```yaml
-# OutO Configuration
+# OutObot Configuration
 # Edit this file to configure your agents and providers
 
 server:
@@ -214,7 +214,7 @@ agents:
 # UI Settings
 ui:
   theme: "neo-brutalism"
-  title: "OutO - Multi-Agent AI System"
+  title: "OutObot - Multi-Agent AI System"
   session_timeout: 3600
 ```
 
@@ -246,7 +246,7 @@ KIMI_API_KEY=your-kimi-key-here
 
 ## Web UI Configuration
 
-The easiest way to configure OutO is via the web UI:
+The easiest way to configure OutObot is via the web UI:
 
 1. Open http://localhost:7227
 2. Go to Settings tab
@@ -312,7 +312,7 @@ cp -r ~/backup/outobot_config/* ~/.outobot/config/
 
 ## Dependencies
 
-OutO requires the following Python packages:
+OutObot requires the following Python packages:
 
 | Package | Purpose |
 |---------|---------|

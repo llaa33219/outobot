@@ -1,5 +1,5 @@
 """
-OutO Server Routes - Static file serving
+OutObot Server Routes - Static file serving
 """
 
 from pathlib import Path

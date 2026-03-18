@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# OutO Uninstallation Script
-# Completely removes OutO from the system
+# OutObot Uninstallation Script
+# Completely removes OutObot from the system
 #
 
 set -e
@@ -15,13 +15,13 @@ OUTOBOT_DIR="$HOME/.outobot"
 SYSTEMD_SERVICE="$HOME/.config/systemd/user/outo.service"
 
 echo -e "${RED}========================================${NC}"
-echo -e "${RED}  OutO Uninstallation${NC}"
+echo -e "${RED}  OutObot Uninstallation${NC}"
 echo -e "${RED}========================================${NC}"
 echo ""
 
 # Check if installed
 if [ ! -d "$OUTOBOT_DIR" ]; then
-    echo -e "${YELLOW}OutO is not installed. Nothing to do.${NC}"
+    echo -e "${YELLOW}OutObot is not installed. Nothing to do.${NC}"
     exit 0
 fi
 
@@ -31,7 +31,7 @@ echo "  - $SYSTEMD_SERVICE (if exists)"
 echo "  - Any symlinks to skills directories"
 echo ""
 
-read -p "Are you sure you want to uninstall OutO? (yes/no): " confirm
+read -p "Are you sure you want to uninstall OutObot? (yes/no): " confirm
 
 if [ "$confirm" != "yes" ]; then
     echo "Cancelled."
@@ -39,11 +39,11 @@ if [ "$confirm" != "yes" ]; then
 fi
 
 echo ""
-echo -e "${YELLOW}[1/5] Stopping OutO service...${NC}"
+echo -e "${YELLOW}[1/5] Stopping OutObot service...${NC}"
 systemctl --user stop outo.service 2>/dev/null || true
 echo -e "  Service stopped."
 
-echo -e "${YELLOW}[2/5] Removing OutO directory...${NC}"
+echo -e "${YELLOW}[2/5] Removing OutObot directory...${NC}"
 if [ -d "$OUTOBOT_DIR" ]; then
     rm -rf "$OUTOBOT_DIR"
     echo -e "  Removed: $OUTOBOT_DIR"
@@ -86,8 +86,8 @@ fi
 
 echo ""
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}  OutO has been completely removed${NC}"
+echo -e "${GREEN}  OutObot has been completely removed${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
-echo "Thank you for using OutO!"
+echo "Thank you for using OutObot!"
 echo ""

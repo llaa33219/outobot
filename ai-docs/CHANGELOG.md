@@ -1,4 +1,4 @@
-# OutO Changelog
+# OutObot Changelog
 
 ## 2026-03-18 - Frontend Agent Card Fix
 

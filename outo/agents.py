@@ -1,5 +1,5 @@
 """
-OutO Agent Definitions
+OutObot Agent Definitions
 Supports MiniMax, GLM, GLM Coding Plan, Kimi (Moonshot AI)
 """
 
@@ -167,7 +167,7 @@ You can delegate to these specialized agents:
 
 AGENT_ROLES = {
     "outo": {
-        "name": "OutO",
+        "name": "OutObot",
         "role": "Coordinator",
         "description": "Main orchestrator - delegates tasks to appropriate agents",
     },

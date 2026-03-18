@@ -1,5 +1,5 @@
 """
-OutO Server Routes - File upload endpoint
+OutObot Server Routes - File upload endpoint
 """
 
 from pathlib import Path

@@ -1,6 +1,6 @@
-# OutO - Your Personal AI Agent Team
+# OutObot - Your Personal AI Agent Team
 
-OutO is a multi-agent AI system where multiple AI agents collaborate to complete tasks. Instead of one AI handling everything, specialized agents work together.
+OutObot is a multi-agent AI system where multiple AI agents collaborate to complete tasks. Instead of one AI handling everything, specialized agents work together.
 
 ## Core Philosophy
 
@@ -16,7 +16,7 @@ OutO is a multi-agent AI system where multiple AI agents collaborate to complete
 
 | Agent | Role | Description |
 |-------|------|-------------|
-| **OutO** | Coordinator | Team lead. Delegates and orchestrates tasks |
+| **OutObot** | Coordinator | Team lead. Delegates and orchestrates tasks |
 | **Peritus** | Professional | General professional work |
 | **Inquisitor** | Research | Research and investigation specialist |
 | **Rimor** | Explorer | Precise and fast exploration |
@@ -56,14 +56,14 @@ All agents will use your selected provider.
 
 Now you're ready to chat!
 
-1. Select an agent from the left (default: OutO)
+1. Select an agent from the left (default: OutObot)
 2. Type a message and click Send
 3. The agent will respond
 
 ## Features
 
 ### Multi-Agent Collaboration
-When needed, OutO automatically delegates to other agents. For example:
+When needed, OutObot automatically delegates to other agents. For example:
 - Asks Inquisitor to research
 - Has Recensor review the work
 - Gets creative suggestions from Creativus
@@ -77,7 +77,7 @@ Remembers your previous conversations so you can continue where you left off.
 - Start a new conversation with "New Session"
 
 ### Enhanced Agent Loop Display
-OutO shows detailed internal events during agent execution:
+OutObot shows detailed internal events during agent execution:
 - Tool calls with arguments
 - Tool results
 - Agent delegation with messages
@@ -102,7 +102,7 @@ Running install.sh again will automatically update to the latest version.
 
 Apache License 2.0
 
-Copyright 2026 OutO Contributors
+Copyright 2026 OutObot Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

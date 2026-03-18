@@ -1,6 +1,6 @@
-# OutO Technical Documentation
+# OutObot Technical Documentation
 
-Core philosophy and architecture for OutO - Multi-Agent AI System.
+Core philosophy and architecture for OutObot - Multi-Agent AI System.
 
 ## Philosophy
 
@@ -17,7 +17,7 @@ Core philosophy and architecture for OutO - Multi-Agent AI System.
 
 ### Why Peer-to-Peer?
 
-Traditional frameworks use an orchestrator pattern where one agent controls all others. This creates bottlenecks and single points of failure. OutO uses the AgentOutO peer-to-peer model:
+Traditional frameworks use an orchestrator pattern where one agent controls all others. This creates bottlenecks and single points of failure. OutObot uses the AgentOutObot peer-to-peer model:
 
 - No hierarchy: Every agent is equal
 - No restrictions: Any agent can call any other agent
@@ -27,13 +27,13 @@ Traditional frameworks use an orchestrator pattern where one agent controls all 
 
 ### Starting Agent
 
-**OutO is the only starting agent.** Users communicate with OutO, and OutO delegates to other agents as needed. This ensures consistent orchestration and quality control.
+**OutObot is the only starting agent.** Users communicate with OutObot, and OutObot delegates to other agents as needed. This ensures consistent orchestration and quality control.
 
 ### Agent Roles
 
 | Agent | Purpose | Best For |
 |-------|---------|----------|
-| OutO | Main coordinator | Task orchestration, delegation |
+| OutObot | Main coordinator | Task orchestration, delegation |
 | Peritus | Professional | General professional work |
 | Inquisitor | Research | Research and investigation |
 | Rimor | Explorer | Precise and fast exploration |
@@ -50,11 +50,11 @@ Two message types only:
 2. **Return**: Agent returns result to calling agent
 
 ```
-User → OutO → Inquisitor → (research)
+User → OutObot → Inquisitor → (research)
                 ↓
             Recensor → (review)
                 ↓
-            OutO → User
+            OutObot → User
 ```
 
 ## Quick Links

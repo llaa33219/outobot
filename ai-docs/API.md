@@ -1,6 +1,6 @@
-# OutO API Reference
+# OutObot API Reference
 
-Complete API documentation for OutO - Multi-Agent AI System.
+Complete API documentation for OutObot - Multi-Agent AI System.
 
 ## Base URL
 
@@ -279,7 +279,7 @@ List all available agents.
 ```json
 {
   "agents": {
-    "outo": {"name": "OutO", "role": "Coordinator", "description": "Main orchestrator - delegates tasks to appropriate agents"},
+    "outo": {"name": "OutObot", "role": "Coordinator", "description": "Main orchestrator - delegates tasks to appropriate agents"},
     "peritus": {"name": "Peritus", "role": "Professional", "description": "General professional work - handles diverse tasks with expertise"},
     "inquisitor": {"name": "Inquisitor", "role": "Research", "description": "Research and investigation specialist"},
     "rimor": {"name": "Rimor", "role": "Explorer", "description": "Precise and fast exploration - finds information quickly"},

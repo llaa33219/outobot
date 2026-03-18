@@ -8,7 +8,7 @@ const PROVIDER_KEYS = [
 ];
 
 const AGENT_DEFAULTS = {
-  'outo': { icon: '🤖', label: 'OutO', role: 'Coordinator', desc: 'Main orchestrator' },
+  'outo': { icon: '🤖', label: 'OutObot', role: 'Coordinator', desc: 'Main orchestrator' },
   'peritus': { icon: '💼', label: 'Peritus', role: 'Professional', desc: 'General work' },
   'inquisitor': { icon: '🔍', label: 'Inquisitor', role: 'Research', desc: 'Research specialist' },
   'rimor': { icon: '🚀', label: 'Rimor', role: 'Explorer', desc: 'Fast exploration' },
@@ -18,7 +18,7 @@ const AGENT_DEFAULTS = {
   'artifex': { icon: '🎭', label: 'Artifex', role: 'Artistic', desc: 'Design work' },
 };
 
-class OutOChat {
+class OutObotChat {
   constructor() {
     this.els = {
       agentBar: document.getElementById('agentBar'),
@@ -670,14 +670,14 @@ class OutOChat {
       welcome.id = 'welcome';
       welcome.innerHTML = `
         <div class="welcome-icon">
-          <img src="/logo.svg" alt="OutO" class="welcome-logo-img">
+          <img src="/logo.svg" alt="OutObot" class="welcome-logo-img">
         </div>
-        <h2>Welcome to OutO</h2>
+        <h2>Welcome to OutObot</h2>
         <p>Your multi-agent AI system.<br>Multiple specialist agents collaborate to answer your questions.</p>
         <div class="welcome-agents">
           <div class="welcome-agent">
             <span class="agent-icon">🤖</span>
-            <span>OutO</span>
+            <span>OutObot</span>
           </div>
           <div class="welcome-agent">
             <span class="agent-icon">💼</span>
@@ -1636,5 +1636,5 @@ class OutOChat {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  window.chat = new OutOChat();
+  window.chat = new OutObotChat();
 });

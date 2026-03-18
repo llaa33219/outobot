@@ -1,14 +1,14 @@
-# OutO Skills System
+# OutObot Skills System
 
-Documentation for the skills management system in OutO.
+Documentation for the skills management system in OutObot.
 
 ## Overview
 
-Skills are reusable capabilities that agents can use to perform specialized tasks. OutO supports syncing skills from various AI agent tools and installing new skills from npm.
+Skills are reusable capabilities that agents can use to perform specialized tasks. OutObot supports syncing skills from various AI agent tools and installing new skills from npm.
 
 ## Skill Sources
 
-OutO can sync skills from 7 different AI agent tools:
+OutObot can sync skills from 7 different AI agent tools:
 
 | Agent | Path | Description |
 |-------|------|-------------|
@@ -199,7 +199,7 @@ The auto-sync feature automatically keeps your skills up to date with their orig
 
 ### When Auto-Sync Runs
 
-- **Startup Sync**: If `sync_on_startup` is true, a full synchronization process initiates immediately when the OutO server starts.
+- **Startup Sync**: If `sync_on_startup` is true, a full synchronization process initiates immediately when the OutObot server starts.
 - **Periodic Sync**: While the server is running, it checks for updates every `interval_minutes` if `enabled` is set to true.
 
 ### Configuring Auto-Sync

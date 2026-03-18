@@ -1,5 +1,5 @@
 """
-OutO Tools
+OutObot Tools
 Default tools available to all agents
 """
 

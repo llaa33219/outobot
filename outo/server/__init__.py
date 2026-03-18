@@ -1,5 +1,5 @@
 """
-OutO Server - Modular server components
+OutObot Server - Modular server components
 
 This package contains the server components extracted from run.py
 for better code organization and maintainability.

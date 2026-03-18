@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# OutO Dev Reinstall Script
-# Completely removes and reinstalls OutO for testing
+# OutObot Dev Reinstall Script
+# Completely removes and reinstalls OutObot for testing
 #
 
 set -e
@@ -14,7 +14,7 @@ NC='\033[0m'
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}  OutO Dev Reinstall${NC}"
+echo -e "${GREEN}  OutObot Dev Reinstall${NC}"
 echo -e "${GREEN}  (For testing purposes)${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
@@ -31,5 +31,5 @@ echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}  Dev Reinstall Complete!${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
-echo "OutO has been reset to fresh installation state."
+echo "OutObot has been reset to fresh installation state."
 echo ""

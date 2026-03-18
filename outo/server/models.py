@@ -1,5 +1,5 @@
 """
-OutO Server Models - Pydantic models for API requests/responses
+OutObot Server Models - Pydantic models for API requests/responses
 """
 
 from pydantic import BaseModel

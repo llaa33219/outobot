@@ -1,5 +1,5 @@
 """
-OutO Server Routes - API route modules
+OutObot Server Routes - API route modules
 """
 
 from . import static, providers, skills, agents, sessions, chat, upload

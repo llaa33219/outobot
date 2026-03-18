@@ -1,4 +1,4 @@
-# OutO Development Notes
+# OutObot Development Notes
 
 ## ⚠️ Important: Development vs Production Paths
 
@@ -116,7 +116,7 @@ curl -sSL https://raw.githubusercontent.com/.../install.sh | bash
 ├── install.sh           # Production installer
 ├── uninstall.sh        # Uninstaller
 ├── dev-reinstall.sh    # Developer reinstall script
-├── logo.svg            # OutO logo
+├── logo.svg            # OutObot logo
 ├── ai-docs/            # This documentation
 └── skills/             # Skills (symlink to ~/.outobot/skills in dev)
 ```
@@ -193,7 +193,7 @@ Modular server components extracted from run.py:
 
 ### Agent System Update
 - Changed from provider-based agents to role-based agents
-- New agents: OutO, Peritus, Inquisitor, Rimor, Recensor, Cogitator, Creativus, Artifex
+- New agents: OutObot, Peritus, Inquisitor, Rimor, Recensor, Cogitator, Creativus, Artifex
 - All agents now use the same provider (user selects one in settings)
 - Single provider selection for all agents ensures consistency
 

@@ -1,5 +1,5 @@
 """
-OutO Server Session Management - Session load/save functions
+OutObot Server Session Management - Session load/save functions
 """
 
 import json

@@ -1,5 +1,5 @@
 """
-OutO Skills Management
+OutObot Skills Management
 Handles skill syncing from various AI agent tools
 """
 

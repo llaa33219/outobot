@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# OutO Installation Script
-# Sets up the OutO multi-agent AI system
+# OutObot Installation Script
+# Sets up the OutObot multi-agent AI system
 #
 
 # Don't exit on error - continue through issues
@@ -22,7 +22,7 @@ VERSION_FILE="$OUTOBOT_DIR/.version"
 CURRENT_VERSION="1.0.0"
 
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}  OutO Installation${NC}"
+echo -e "${GREEN}  OutObot Installation${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 
@@ -56,7 +56,7 @@ check_dependencies() {
     if ! command -v distrobox &> /dev/null; then
         echo -e "${RED}ERROR: distrobox is required but not installed.${NC}"
         echo ""
-        echo "OutO requires distrobox for secure container isolation."
+        echo "OutObot requires distrobox for secure container isolation."
         echo "To install:"
         echo ""
         echo "  # Arch Linux"
@@ -98,7 +98,7 @@ check_dependencies() {
     fi
 }
 
-# Create OutO directory structure
+# Create OutObot directory structure
 setup_directory() {
     # Check if already installed
     if [ -d "$OUTOBOT_DIR" ] && [ -f "$VERSION_FILE" ]; then
@@ -133,7 +133,7 @@ else
     echo -e "  Directory structure ready (user data preserved)"
 }
 
-# Copy source files to OutO directory
+# Copy source files to OutObot directory
 copy_source_files() {
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     
@@ -227,8 +227,8 @@ setup_run_script() {
     # Main run script
     cat > "$OUTOBOT_DIR/run.sh" << 'SCRIPT'
 #!/bin/bash
-# OutO Runner Script
-# Launches the OutO server
+# OutObot Runner Script
+# Launches the OutObot server
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_BIN="$SCRIPT_DIR/venv/bin"
@@ -246,7 +246,7 @@ SCRIPT
     mkdir -p "$HOME/.config/systemd/user"
     cat > "$HOME/.config/systemd/user/outo.service" << 'SERVICE'
 [Unit]
-Description=OutO Multi-Agent AI System
+Description=OutObot Multi-Agent AI System
 After=network.target
 
 [Service]
@@ -272,7 +272,7 @@ setup_config() {
     # Sample config.yaml
     if [ ! -f "$OUTOBOT_DIR/config/config.yaml" ]; then
         cat > "$OUTOBOT_DIR/config/config.yaml" << 'CONFIG'
-# OutO Configuration
+# OutObot Configuration
 # Edit this file to configure your agents and providers
 
 server:
@@ -349,7 +349,7 @@ agents:
 # UI Settings
 ui:
   theme: "neo-brutalism"
-  title: "OutO - Multi-Agent AI System"
+  title: "OutObot - Multi-Agent AI System"
   session_timeout: 3600
 CONFIG
         echo -e "  Created: $OUTOBOT_DIR/config/config.yaml"
@@ -358,7 +358,7 @@ CONFIG
     # Create .env example
     if [ ! -f "$OUTOBOT_DIR/config/.env.example" ]; then
         cat > "$OUTOBOT_DIR/config/.env.example" << 'ENV'
-# OutO Environment Variables
+# OutObot Environment Variables
 # Copy this to .env and fill in your API keys
 
 # OpenAI API Key
@@ -404,7 +404,7 @@ setup_distrobox() {
 
 # Auto-start the service
 auto_start() {
-    echo -e "\n${YELLOW}[6/6] Starting OutO service...${NC}"
+    echo -e "\n${YELLOW}[6/6] Starting OutObot service...${NC}"
     
     if systemctl --user list-unit-files outo.service &>/dev/null; then
         systemctl --user enable outo.service
@@ -413,7 +413,7 @@ auto_start() {
         sleep 2
         
         if systemctl --user is-active --quiet outo.service; then
-            echo -e "  OutO service started successfully!"
+            echo -e "  OutObot service started successfully!"
             echo -e "  Open http://localhost:7227 in your browser"
         else
             echo -e "  ${YELLOW}Warning: Service started but may not be ready yet.${NC}"
@@ -439,7 +439,7 @@ main() {
     echo -e "${GREEN}  Installation Complete!${NC}"
     echo -e "${GREEN}========================================${NC}"
     echo ""
-    echo "OutO is starting automatically..."
+    echo "OutObot is starting automatically..."
     echo "Open http://localhost:7227 in your browser"
     echo ""
     echo "To manage the service:"

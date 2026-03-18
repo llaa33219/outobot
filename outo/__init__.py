@@ -1,5 +1,5 @@
 """
-OutO Core Package
+OutObot Core Package
 Multi-agent AI system core modules
 """
 

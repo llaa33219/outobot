@@ -1,5 +1,5 @@
 """
-OutO Server Routes - Skills management endpoints
+OutObot Server Routes - Skills management endpoints
 """
 
 # pyright: reportMissingImports=false

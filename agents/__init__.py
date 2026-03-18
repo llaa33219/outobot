@@ -1,5 +1,5 @@
 """
-OutO Agent Definitions
+OutObot Agent Definitions
 Core agents for the multi-agent system
 """
 

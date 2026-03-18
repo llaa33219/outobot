@@ -1,5 +1,5 @@
 """
-OutO Server Routes - Session management endpoints
+OutObot Server Routes - Session management endpoints
 """
 
 from pathlib import Path

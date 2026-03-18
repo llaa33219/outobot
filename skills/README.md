@@ -1,4 +1,4 @@
-# OutO Skills
+# OutObot Skills
 
 Skills define the capabilities of agents. This directory contains registered skills that can be loaded by agents.
 
