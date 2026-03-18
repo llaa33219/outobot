@@ -1,7 +1,7 @@
 # OutObot - Your Personal AI Agent Team
 
 <p align="center">
-  <img src="logo.svg" width="280" alt="OutObot">
+  <img src="logo.svg" width="644" alt="OutObot">
 </p>
 
 OutObot is a multi-agent AI system where multiple AI agents collaborate to complete tasks. Instead of one AI handling everything, specialized agents work together.
