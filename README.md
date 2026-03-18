@@ -30,7 +30,7 @@ OutO is a multi-agent AI system where multiple AI agents collaborate to complete
 ### Step 1: Install
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/.../install.sh | bash
+curl -sSL https://raw.githubusercontent.com/llaa33219/outobot/main/install.sh | bash
 ```
 
 This installs everything to `~/.outobot/`
