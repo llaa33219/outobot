@@ -1,5 +1,7 @@
 # OutObot Agent System
 
+> **Note**: This document is for developers editing agent instructions. The actual agent instructions are embedded in `outo/agents.py` — changes here must be synced to the code. Running AI agents read their instructions from `outo/agents.py`, not from these docs.
+
 Detailed documentation for OutObot's multi-agent system.
 
 ## Overview
@@ -137,6 +139,8 @@ When you need to use a skill:
 
 Skills are stored in ~/.outobot/skills/ directory. Each skill has a SKILL.md file with full documentation.
 
+When useful, write notes to ~/.outobot/note/ for future reference. Check existing notes there to recall context from previous sessions.
+
 You can delegate to these specialized agents:
 - peritus: General professional work
 - inquisitor: Research and investigation
@@ -161,6 +165,8 @@ When you need to use a skill:
 4. Apply the skill instructions to complete the task
 
 Skills are stored in ~/.outobot/skills/ directory. Each skill has a SKILL.md file with full documentation.
+
+When useful, write notes to ~/.outobot/note/ for future reference. Check existing notes there to recall context from previous sessions.
 ```
 
 ### Inquisitor (Research)
@@ -177,6 +183,8 @@ When you need to use a skill:
 4. Apply the skill instructions to complete the task
 
 Skills are stored in ~/.outobot/skills/ directory. Each skill has a SKILL.md file with full documentation.
+
+When useful, write notes to ~/.outobot/note/ for future reference. Check existing notes there to recall context from previous sessions.
 ```
 
 ### Rimor (Explorer)
@@ -193,6 +201,8 @@ When you need to use a skill:
 4. Apply the skill instructions to complete the task
 
 Skills are stored in ~/.outobot/skills/ directory. Each skill has a SKILL.md file with full documentation.
+
+When useful, write notes to ~/.outobot/note/ for future reference. Check existing notes there to recall context from previous sessions.
 ```
 
 ### Recensor (Review)
@@ -209,6 +219,8 @@ When you need to use a skill:
 4. Apply the skill instructions to complete the task
 
 Skills are stored in ~/.outobot/skills/ directory. Each skill has a SKILL.md file with full documentation.
+
+When useful, write notes to ~/.outobot/note/ for future reference. Check existing notes there to recall context from previous sessions.
 ```
 
 ### Cogitator (Thinking)
@@ -225,6 +237,8 @@ When you need to use a skill:
 4. Apply the skill instructions to complete the task
 
 Skills are stored in ~/.outobot/skills/ directory. Each skill has a SKILL.md file with full documentation.
+
+When useful, write notes to ~/.outobot/note/ for future reference. Check existing notes there to recall context from previous sessions.
 ```
 
 ### Creativus (Creative)
@@ -241,6 +255,8 @@ When you need to use a skill:
 4. Apply the skill instructions to complete the task
 
 Skills are stored in ~/.outobot/skills/ directory. Each skill has a SKILL.md file with full documentation.
+
+When useful, write notes to ~/.outobot/note/ for future reference. Check existing notes there to recall context from previous sessions.
 ```
 
 ### Artifex (Artistic)
@@ -257,6 +273,8 @@ When you need to use a skill:
 4. Apply the skill instructions to complete the task
 
 Skills are stored in ~/.outobot/skills/ directory. Each skill has a SKILL.md file with full documentation.
+
+When useful, write notes to ~/.outobot/note/ for future reference. Check existing notes there to recall context from previous sessions.
 ```
 
 ## Agent Delegation

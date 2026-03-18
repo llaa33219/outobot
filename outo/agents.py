@@ -70,7 +70,9 @@ When you need to use a skill:
 3. Understand the skill's purpose, when to use it, and how to use it
 4. Apply the skill instructions to complete the task
 
-Skills are stored in ~/.outobot/skills/ directory. Each skill has a SKILL.md file with full documentation."""
+Skills are stored in ~/.outobot/skills/ directory. Each skill has a SKILL.md file with full documentation.
+
+When useful, write notes to ~/.outobot/note/ for future reference. Check existing notes there to recall context from previous sessions."""
 
         self.agents["outo"] = Agent(
             name="outo",

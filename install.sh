@@ -169,6 +169,9 @@ copy_source_files() {
         echo -e "  Copied: logo.svg"
     fi
     
+    mkdir -p "$OUTOBOT_DIR/note"
+    echo -e "  Created: note/"
+    
     # Copy static directory (frontend)
     if [ -d "$SCRIPT_DIR/static" ]; then
         cp -r "$SCRIPT_DIR/static" "$OUTOBOT_DIR/"
