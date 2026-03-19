@@ -1242,58 +1242,6 @@ body {
   display: none;
 }
 
-/* ── Breadcrumb ─────────────────────────────────── */
-
-.agent-breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 10px;
-  margin-bottom: 6px;
-  background: var(--bg-primary);
-  border: 2px solid var(--border);
-  font-size: 0.72rem;
-  font-weight: 600;
-  overflow-x: auto;
-  white-space: nowrap;
-  animation: fadeSlideIn 0.2s ease;
-  box-shadow: var(--shadow-sm);
-}
-
-.agent-breadcrumb:empty {
-  display: none;
-}
-
-.agent-breadcrumb::-webkit-scrollbar {
-  height: 3px;
-}
-
-.agent-breadcrumb::-webkit-scrollbar-thumb {
-  background: var(--text-primary);
-}
-
-.bc-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 2px 6px;
-  color: var(--text-secondary);
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-}
-
-.bc-item.active {
-  color: var(--bg-primary);
-  background: var(--text-primary);
-}
-
-.bc-arrow {
-  color: var(--text-primary);
-  font-size: 0.65rem;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-
 @keyframes cardIn {
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }
@@ -2658,35 +2606,6 @@ body {
 
 .install-skill-form input::placeholder {
   color: var(--text-muted);
-}
-
-/* ── Breadcrumb ─────────────────────────────────── */
-
-.breadcrumb {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 8px 16px;
-  background: var(--bg-secondary);
-  border-bottom: 2px solid var(--border);
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.breadcrumb-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  background: var(--bg-primary);
-  border: 2px solid var(--border);
-  color: var(--text-primary);
-}
-
-.breadcrumb-sep {
-  color: var(--text-muted);
-  font-weight: 700;
 }
 
 /* ── Content Stream ─────────────────────────────────── */

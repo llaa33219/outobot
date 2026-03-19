@@ -8,13 +8,13 @@ const PROVIDER_KEYS = [
 ];
 
 const AGENT_DEFAULTS = {
-  'outo': { icon: '🤖', label: 'OutObot', role: 'Coordinator', desc: 'Main orchestrator' },
-  'peritus': { icon: '💼', label: 'Peritus', role: 'Professional', desc: 'General work' },
-  'inquisitor': { icon: '🔍', label: 'Inquisitor', role: 'Research', desc: 'Research specialist' },
-  'rimor': { icon: '🚀', label: 'Rimor', role: 'Explorer', desc: 'Fast exploration' },
-  'recensor': { icon: '✅', label: 'Recensor', role: 'Review', desc: 'Verification' },
+  'outo': { icon: '🔆', label: 'OutObot', role: 'Coordinator', desc: 'Main orchestrator' },
+  'peritus': { icon: '💠', label: 'Peritus', role: 'Professional', desc: 'General work' },
+  'inquisitor': { icon: '🔎', label: 'Inquisitor', role: 'Research', desc: 'Research specialist' },
+  'rimor': { icon: '⚡', label: 'Rimor', role: 'Explorer', desc: 'Fast exploration' },
+  'recensor': { icon: '✔', label: 'Recensor', role: 'Review', desc: 'Verification' },
   'cogitator': { icon: '🧠', label: 'Cogitator', role: 'Thinking', desc: 'Deep analysis' },
-  'creativus': { icon: '🎨', label: 'Creativus', role: 'Creative', desc: 'Creative solutions' },
+  'creativus': { icon: '✨', label: 'Creativus', role: 'Creative', desc: 'Creative solutions' },
   'artifex': { icon: '🎭', label: 'Artifex', role: 'Artistic', desc: 'Design work' },
 };
 
@@ -75,7 +75,6 @@ class OutObotChat {
     this.hasStreamedTopLevel = false;
     this.callStack = [];
     this.agentStartTimes = {};
-    this.breadcrumbEl = document.getElementById('breadcrumb');
     this.agentMeta = AGENT_DEFAULTS;
 
     if (window.innerWidth <= 960) {
@@ -289,7 +288,6 @@ class OutObotChat {
           this.callStack.push(caller);
         }
         this.callStack.push(target);
-        this.updateBreadcrumb();
         this.addLogEntry(this.getAgentIcon(caller), '<strong>' + this.getAgentLabel(caller) + '</strong> → <strong>' + this.getAgentLabel(target) + '</strong> called', null, data.message ? this.truncateText(data.message, 120) : null);
         this.scrollToBottom();
         break;
@@ -323,7 +321,6 @@ class OutObotChat {
         delete this.agentStartTimes[agent];
         const retIdx = this.callStack.lastIndexOf(agent);
         if (retIdx >= 0) this.callStack.splice(retIdx, 1);
-        this.updateBreadcrumb();
         this.addLogEntry(this.getAgentIcon(agent), '<strong>' + this.getAgentLabel(agent) + '</strong> done', null, data.result ? this.truncateText(data.result, 120) : null);
         break;
       }
@@ -378,10 +375,6 @@ class OutObotChat {
         });
         this.subAgentCards = {};
         this.callStack = [];
-        this.updateBreadcrumb();
-        if (this.breadcrumbEl) {
-          this.breadcrumbEl.innerHTML = '';
-        }
         if (this.currentTextSegment && !this.currentTextSegment.textContent.trim() && !this.currentTextSegment.innerHTML.trim()) {
           this.currentTextSegment.remove();
           this.currentTextSegment = null;
@@ -429,10 +422,6 @@ class OutObotChat {
         });
         this.subAgentCards = {};
         this.callStack = [];
-        this.updateBreadcrumb();
-        if (this.breadcrumbEl) {
-          this.breadcrumbEl.innerHTML = '';
-        }
         this.showError(data.message || 'An unknown error occurred.');
         this.deactivateAllAgents();
         this.setProcessing(false);
@@ -463,7 +452,11 @@ class OutObotChat {
       const res = await fetch('/api/agents');
       const data = await res.json();
       if (data.agents && typeof data.agents === 'object') {
-        this.agentConfig = data.agents;
+        const merged = {};
+        Object.keys(AGENT_DEFAULTS).forEach(key => {
+          merged[key] = { ...AGENT_DEFAULTS[key], ...(data.agents[key] || {}) };
+        });
+        this.agentConfig = merged;
       }
     } catch (err) {
       console.error('Failed to load agents:', err);
@@ -507,7 +500,7 @@ class OutObotChat {
       const badge = document.createElement('div');
       badge.className = 'agent-badge';
       badge.dataset.agent = key;
-      badge.innerHTML = `<span class="badge-icon">${agent.icon || '🤖'}</span>${agent.label || agent.name || key}`;
+      badge.innerHTML = `<span class="badge-icon">${agent.icon || '🔆'}</span>${agent.label || agent.name || key}`;
       this.els.agentBar.appendChild(badge);
     });
   }
@@ -593,7 +586,7 @@ class OutObotChat {
       card.className = 'sidebar-agent';
       card.dataset.agent = key;
       card.innerHTML = `
-        <div class="sa-icon">${agent.icon || '🤖'}</div>
+        <div class="sa-icon">${agent.icon || '🔆'}</div>
         <div class="sa-info">
           <div class="sa-name">${agent.label || agent.name || key}</div>
           <div class="sa-status">${agent.role || 'Agent'}</div>
@@ -660,9 +653,6 @@ class OutObotChat {
     chatArea.querySelectorAll('.agent-card').forEach(el => el.remove());
     chatArea.querySelectorAll('.tool-card').forEach(el => el.remove());
     
-    const breadcrumb = chatArea.querySelector('.breadcrumb');
-    if (breadcrumb) breadcrumb.innerHTML = '';
-    
     let welcome = chatArea.querySelector('.welcome');
     if (!welcome) {
       welcome = document.createElement('div');
@@ -676,23 +666,23 @@ class OutObotChat {
         <p>Your multi-agent AI system.<br>Multiple specialist agents collaborate to answer your questions.</p>
         <div class="welcome-agents">
           <div class="welcome-agent">
-            <span class="agent-icon">🤖</span>
+            <span class="agent-icon">🔆</span>
             <span>OutObot</span>
           </div>
           <div class="welcome-agent">
-            <span class="agent-icon">💼</span>
+            <span class="agent-icon">💠</span>
             <span>Peritus</span>
           </div>
           <div class="welcome-agent">
-            <span class="agent-icon">🔍</span>
+            <span class="agent-icon">🔎</span>
             <span>Inquisitor</span>
           </div>
           <div class="welcome-agent">
-            <span class="agent-icon">🚀</span>
+            <span class="agent-icon">⚡</span>
             <span>Rimor</span>
           </div>
           <div class="welcome-agent">
-            <span class="agent-icon">✅</span>
+            <span class="agent-icon">✔</span>
             <span>Recensor</span>
           </div>
           <div class="welcome-agent">
@@ -700,7 +690,7 @@ class OutObotChat {
             <span>Cogitator</span>
           </div>
           <div class="welcome-agent">
-            <span class="agent-icon">🎨</span>
+            <span class="agent-icon">✨</span>
             <span>Creativus</span>
           </div>
           <div class="welcome-agent">
@@ -730,10 +720,6 @@ class OutObotChat {
     this.agentStartTimes = {};
     this.activeAgents.clear();
     this.involvedAgents.clear();
-    
-    if (this.breadcrumbEl) {
-      this.breadcrumbEl.innerHTML = '';
-    }
     
     this.logActivity('Started new session');
   }
@@ -841,9 +827,6 @@ class OutObotChat {
     this.subAgentCards = {};
     this.callStack = [];
     this.agentStartTimes = {};
-    if (this.breadcrumbEl) {
-      this.breadcrumbEl.innerHTML = '';
-    }
     this.clearActivityLog();
     this.addLogEntry('💬', '<strong>User</strong> message sent');
   }
@@ -888,7 +871,7 @@ class OutObotChat {
   ensureAgentBubble(agentName) {
     if (this.currentBubble) return;
 
-    const meta = this.agentMeta[agentName] || { icon: '🤖', label: agentName, color: '#6366f1' };
+    const meta = this.agentMeta[agentName] || { icon: '🔆', label: agentName, color: '#6366f1' };
     const time = this.formatTime();
 
     const msg = document.createElement('div');
@@ -897,7 +880,7 @@ class OutObotChat {
     const avatar = document.createElement('div');
     avatar.className = 'message-avatar';
     avatar.style.background = meta.color || '#6366f1';
-    avatar.textContent = meta.icon || '🤖';
+    avatar.textContent = meta.icon || '🔆';
 
     const body = document.createElement('div');
     body.className = 'message-body';
@@ -960,8 +943,8 @@ class OutObotChat {
   }
 
   createAgentCard(caller, target, message) {
-    const callerMeta = this.agentMeta[caller] || { icon: '🤖', label: caller, color: '#6366f1' };
-    const targetMeta = this.agentMeta[target] || { icon: '🤖', label: target, color: '#6366f1' };
+    const callerMeta = this.agentMeta[caller] || { icon: '🔆', label: caller, color: '#6366f1' };
+    const targetMeta = this.agentMeta[target] || { icon: '🔆', label: target, color: '#6366f1' };
 
     let depth = 0;
     if (this.subAgentCards[caller]) {
@@ -1070,7 +1053,7 @@ class OutObotChat {
   }
 
   createToolCard(agentName, toolName, args) {
-    const meta = this.agentMeta[agentName] || { icon: '🤖', label: agentName, color: '#6366f1' };
+    const meta = this.agentMeta[agentName] || { icon: '🔆', label: agentName, color: '#6366f1' };
 
     const card = document.createElement('div');
     card.className = 'interaction-card tool-card';
@@ -1109,24 +1092,6 @@ class OutObotChat {
     }
   }
 
-  updateBreadcrumb() {
-    if (!this.breadcrumbEl) return;
-    this.breadcrumbEl.innerHTML = '';
-    this.callStack.forEach((agent, idx) => {
-      if (idx > 0) {
-        const sep = document.createElement('span');
-        sep.className = 'breadcrumb-sep';
-        sep.textContent = ' → ';
-        this.breadcrumbEl.appendChild(sep);
-      }
-      const meta = this.agentMeta[agent] || { icon: '🤖', label: agent };
-      const item = document.createElement('span');
-      item.className = 'breadcrumb-item';
-      item.textContent = (meta.icon || '🤖') + ' ' + (meta.label || agent);
-      this.breadcrumbEl.appendChild(item);
-    });
-  }
-
   addActivityChip(type, text) {
     const activity = this.currentActivityEl;
     if (!activity) return;
@@ -1163,7 +1128,7 @@ class OutObotChat {
 
   getAgentIcon(agentName) {
     const meta = this.agentMeta[agentName] || {};
-    return meta.icon || '🤖';
+    return meta.icon || '🔆';
   }
 
   getAgentLabel(agentName) {
@@ -1263,11 +1228,11 @@ class OutObotChat {
   }
 
   createAgentBubble(agentName, container) {
-    const agent = this.agentConfig[agentName] || { icon: '🤖', label: agentName };
+    const agent = this.agentConfig[agentName] || { icon: '🔆', label: agentName };
     const bubble = document.createElement('div');
     bubble.className = 'message agent';
     bubble.innerHTML = `
-      <div class="message-avatar">${agent.icon || '🤖'}</div>
+      <div class="message-avatar">${agent.icon || '🔆'}</div>
       <div class="message-body">
         <div class="message-header">
           <span class="message-name">${agent.label || agent.name || agentName}</span>
