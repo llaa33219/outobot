@@ -34,7 +34,7 @@ class ProviderManager:
             if api_key:
                 self.providers["openai"] = Provider(
                     name="openai",
-                    kind="openai",
+                    kind="openai_responses",
                     api_key=api_key,
                     base_url="https://api.openai.com/v1",
                 )
@@ -158,8 +158,14 @@ class ProviderManager:
 DEFAULT_PROVIDERS = {
     "openai": {
         "name": "OpenAI",
-        "kind": "openai",
-        "models": ["gpt-5.2", "gpt-5.3-codex", "o3", "o4-mini"],
+        "kind": "openai_responses",
+        "models": [
+            "gpt-5.4-pro",
+            "gpt-5.4",
+            "gpt-5.4-mini",
+            "gpt-5.3-codex",
+            "gpt-5.3",
+        ],
         "url": "https://platform.openai.com",
         "base_url": "https://api.openai.com/v1",
     },
@@ -180,7 +186,12 @@ DEFAULT_PROVIDERS = {
     "minimax": {
         "name": "MiniMax",
         "kind": "openai",
-        "models": ["MiniMax-M2.5", "MiniMax-M2.5-highspeed", "MiniMax-M2.1"],
+        "models": [
+            "MiniMax-M2.7",
+            "MiniMax-M2.5-highspeed",
+            "MiniMax-M2.5",
+            "MiniMax-M2.1",
+        ],
         "url": "https://platform.minimax.io",
         "base_url": "https://api.minimax.io/v1",
     },

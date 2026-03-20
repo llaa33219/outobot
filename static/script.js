@@ -507,10 +507,10 @@ class OutObotChat {
 
   getProviderModels(providerName) {
     const defaults = {
-      openai: ['gpt-5.2', 'gpt-5.3-codex', 'o3', 'o4-mini'],
+      openai: ['gpt-5.4-pro', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.3'],
       anthropic: ['claude-opus-4-6', 'claude-sonnet-4-6'],
       google: ['gemini-3.1-pro', 'gemini-3-flash'],
-      minimax: ['MiniMax-M2.5', 'MiniMax-M2.5-highspeed', 'MiniMax-M2.1'],
+      minimax: ['MiniMax-M2.7', 'MiniMax-M2.5-highspeed', 'MiniMax-M2.5', 'MiniMax-M2.1'],
       glm: ['GLM-5', 'GLM-4.7'],
       glm_coding: ['GLM-5', 'GLM-4.7'],
       kimi: ['kimi-k2.5', 'kimi-k2.5-thinking', 'kimi-k2'],
@@ -1308,7 +1308,10 @@ class OutObotChat {
     providers.forEach(key => {
       const input = document.getElementById(`${key}KeyInput`);
       if (input) {
-        input.oninput = () => this.populateDefaultProviderSelect();
+        input.oninput = () => {
+          this.populateDefaultProviderSelect();
+          this.updateDefaultModels();
+        };
       }
     });
   }

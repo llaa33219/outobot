@@ -22,7 +22,7 @@ Active provider configuration with API keys and settings. This is the main confi
   "openai": {
     "enabled": true,
     "api_key": "sk-...",
-    "model": "gpt-5.2"
+    "model": "gpt-5.4"
   },
   "anthropic": {
     "enabled": false,
@@ -37,7 +37,7 @@ Active provider configuration with API keys and settings. This is the main confi
   "minimax": {
     "enabled": false,
     "api_key": "",
-    "model": "MiniMax-M2.5"
+    "model": "MiniMax-M2.7"
   },
   "glm": {
     "enabled": false,
@@ -80,7 +80,7 @@ Active provider configuration with API keys and settings. This is the main confi
 | Setting | Value |
 |---------|-------|
 | Name | OpenAI |
-| Models | gpt-5.2, gpt-5.3-codex, o3, o4-mini |
+| Models | gpt-5.4-pro, gpt-5.4, gpt-5.4-mini, gpt-5.3-codex, gpt-5.3 |
 | Base URL | https://api.openai.com/v1 |
 | API Key | sk-... |
 
@@ -107,7 +107,7 @@ Active provider configuration with API keys and settings. This is the main confi
 | Setting | Value |
 |---------|-------|
 | Name | MiniMax |
-| Models | MiniMax-M2.5, MiniMax-M2.5-highspeed, MiniMax-M2.1 |
+| Models | MiniMax-M2.7, MiniMax-M2.5-highspeed, MiniMax-M2.5, MiniMax-M2.1 |
 | Base URL | https://api.minimax.io/v1 |
 | API Key | Required |
 
@@ -178,7 +178,7 @@ providers:
   openai:
     enabled: false
     api_key: ""
-    # models: gpt-5.2, gpt-5.3-codex, o3, o4-mini
+    # models: gpt-5.4-pro, gpt-5.4, gpt-5.4-mini, gpt-5.3-codex, gpt-5.3
     
   anthropic:
     enabled: false
@@ -200,7 +200,7 @@ providers:
 # Agent configurations
 agents:
   outo:
-    model: "gpt-5.2"
+    model: "gpt-5.4"
     provider: "openai"
     temperature: 1.0
     

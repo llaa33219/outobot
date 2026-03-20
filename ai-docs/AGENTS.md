@@ -84,10 +84,10 @@ Each provider has a default model when selected:
 
 | Provider | Default Model |
 |----------|---------------|
-| openai | gpt-5.2 |
+| openai | gpt-5.4 |
 | anthropic | claude-sonnet-4-6 |
 | google | gemini-3.1-pro |
-| minimax | MiniMax-M2.5 |
+| minimax | MiniMax-M2.7 |
 | glm | GLM-5 |
 | glm_coding | GLM-5 |
 | kimi | kimi-k2.5 |
@@ -295,7 +295,7 @@ User → OutObot → (delegates to) → Inquisitor → (research)
 ```yaml
 agents:
   custom_agent:
-    model: "gpt-5.2"
+    model: "gpt-5.4"
     provider: "openai"
     temperature: 0.8
 ```
@@ -308,7 +308,7 @@ from agentouto import Agent
 custom_agent = Agent(
     name="custom",
     instructions="Your custom agent instructions",
-    model="gpt-5.2",
+    model="gpt-5.4",
     provider="openai",
     temperature=0.8
 )

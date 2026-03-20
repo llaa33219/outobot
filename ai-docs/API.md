@@ -93,7 +93,7 @@ Save provider configuration.
 **Request Body:**
 ```json
 {
-  "openai": {"enabled": true, "api_key": "sk-...", "model": "gpt-5.2"},
+  "openai": {"enabled": true, "api_key": "sk-...", "model": "gpt-5.4"},
   "anthropic": {"enabled": false, "api_key": "", "model": "claude-sonnet-4-6"}
 }
 ```
