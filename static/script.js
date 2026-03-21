@@ -736,6 +736,40 @@ class OutObotChat {
     const welcome = this.els.chatArea.querySelector('.welcome');
     if (welcome) welcome.classList.add('hidden');
     
+    if (data.events && data.events.length > 0) {
+      this.replaySession(data.events);
+    } else {
+      const existingContainer = this.els.chatArea.querySelector('.message-container');
+      if (existingContainer) existingContainer.remove();
+      
+      const container = document.createElement('div');
+      container.className = 'message-container';
+      this.els.chatArea.appendChild(container);
+      
+      data.messages.forEach(msg => {
+        const cat = msg.category;
+        if (cat === 'user' || (msg.sender === 'You')) {
+          this.renderUserMessage(msg.content, container);
+        } else if (cat === 'top-level') {
+          this.renderAgentMessage(msg.content, msg.sender, container);
+        } else if (cat === 'loop-internal') {
+          this.renderLoopInternalMessage(msg.caller || msg.sender, msg.sender, msg.content, container);
+        } else {
+          this.renderAgentMessage(msg.content, msg.sender, container);
+        }
+      });
+    }
+    
+    this.scrollToBottom();
+    this.logActivity(`Loaded session ${sessionId.substring(0, 8)}...`);
+  }
+
+  replaySession(events) {
+    this.subAgentCards = {};
+    this.callStack = [];
+    this.agentTokens = {};
+    this.agentStartTimes = {};
+    
     const existingContainer = this.els.chatArea.querySelector('.message-container');
     if (existingContainer) existingContainer.remove();
     
@@ -743,16 +777,16 @@ class OutObotChat {
     container.className = 'message-container';
     this.els.chatArea.appendChild(container);
     
-    data.messages.forEach(msg => {
-      if (msg.sender === 'You') {
-        this.renderUserMessage(msg.content, container);
-      } else {
-        this.renderAgentMessage(msg.content, msg.sender, container);
-      }
+    this.ensureAgentBubble('outo');
+    
+    events.forEach((event, index) => {
+      setTimeout(() => {
+        this.handleEvent(event);
+        this.scrollToBottom();
+      }, index * 60);
     });
     
-    this.scrollToBottom();
-    this.logActivity(`Loaded session ${sessionId.substring(0, 8)}...`);
+    this.logActivity(`Replaying ${events.length} events...`);
   }
 
   async sendMessage() {
@@ -1228,22 +1262,26 @@ class OutObotChat {
   }
 
   createAgentBubble(agentName, container) {
-    const agent = this.agentConfig[agentName] || { icon: '🔆', label: agentName };
+    const meta = this.agentMeta[agentName] || { icon: '🔆', label: agentName, color: '#6366f1' };
+    const time = this.formatTime();
     const bubble = document.createElement('div');
     bubble.className = 'message agent';
     bubble.innerHTML = `
-      <div class="message-avatar">${agent.icon || '🔆'}</div>
+      <div class="message-avatar" style="background:${meta.color || '#6366f1'};color:var(--bg-primary);">${meta.icon || '🔆'}</div>
       <div class="message-body">
         <div class="message-header">
-          <span class="message-name">${agent.label || agent.name || agentName}</span>
+          <span class="message-name" style="color:${meta.color || '#6366f1'}">${meta.label || agentName}</span>
+          <span class="message-time">${time}</span>
         </div>
-        <div class="activity-container"></div>
-        <div class="message-content"></div>
+        <div class="agent-activity"></div>
+        <div class="content-stream">
+          <div class="text-segment message-content"></div>
+        </div>
         <div class="thinking-indicator hidden">
           <div class="thinking-dots">
             <span></span><span></span><span></span>
           </div>
-          <span>Thinking...</span>
+          <span>Processing...</span>
         </div>
       </div>
     `;
@@ -1269,8 +1307,61 @@ class OutObotChat {
 
   renderAgentMessage(content, agentName, container) {
     const bubble = this.createAgentBubble(agentName, container);
-    const contentEl = bubble.querySelector('.message-content');
-    contentEl.innerHTML = marked.parse(content);
+    const contentStreamEl = bubble.querySelector('.content-stream');
+    if (contentStreamEl) {
+      const returnSection = document.createElement('div');
+      returnSection.className = 'ic-section ic-result-section visible main-return-section';
+      returnSection.innerHTML =
+        '<div class="ic-section-label">✦ Response</div>' +
+        '<div class="ic-content ic-result">' + marked.parse(content) + '</div>';
+      contentStreamEl.appendChild(returnSection);
+    }
+    this.scrollToBottom();
+  }
+
+  renderLoopInternalMessage(caller, target, content, container) {
+    const callerMeta = this.agentMeta[caller] || { icon: '🔆', label: caller, color: '#6366f1' };
+    const targetMeta = this.agentMeta[target] || { icon: '🔆', label: target, color: '#6366f1' };
+
+    const card = document.createElement('div');
+    card.className = 'interaction-card agent-card completed collapsed';
+    card.style.setProperty('--card-color', targetMeta.color);
+    card.dataset.depth = 0;
+
+    const header = document.createElement('div');
+    header.className = 'ic-header';
+    header.innerHTML =
+      '<span class="ic-toggle">▼</span>' +
+      '<span class="ic-header-text">' +
+        '<span style="color:' + callerMeta.color + '">' + callerMeta.icon + ' ' + this.escapeHTML(callerMeta.label) + '</span>' +
+        ' <span class="ic-arrow">→</span> ' +
+        '<span style="color:' + targetMeta.color + '">' + targetMeta.icon + ' ' + this.escapeHTML(targetMeta.label) + '</span>' +
+      '</span>' +
+      '<span class="ic-status done">Done</span>' +
+      '<span class="ic-elapsed"></span>';
+    header.addEventListener('click', () => card.classList.toggle('collapsed'));
+
+    const body = document.createElement('div');
+    body.className = 'ic-body';
+
+    const bodyInner = document.createElement('div');
+    bodyInner.className = 'ic-body-inner';
+
+    const contentStreamEl = document.createElement('div');
+    contentStreamEl.className = 'ic-content-stream';
+
+    const resultSection = document.createElement('div');
+    resultSection.className = 'ic-section ic-result-section visible';
+    resultSection.innerHTML =
+      '<div class="ic-section-label">✦ Result</div>' +
+      '<div class="ic-content ic-result">' + marked.parse(content) + '</div>';
+
+    bodyInner.appendChild(contentStreamEl);
+    bodyInner.appendChild(resultSection);
+    body.appendChild(bodyInner);
+    card.appendChild(header);
+    card.appendChild(body);
+    container.appendChild(card);
     this.scrollToBottom();
   }
 

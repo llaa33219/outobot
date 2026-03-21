@@ -598,6 +598,11 @@ body {
   margin-left: auto;
 }
 
+.message.agent {
+  flex-direction: row;
+  margin-right: auto;
+}
+
 .message-avatar {
   width: 36px;
   height: 36px;
@@ -1247,6 +1252,68 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* ── Delegation Result (session loop-internal) ───────────────── */
+
+.delegation-result {
+  border: 2px solid var(--border);
+  background: var(--bg-secondary);
+  margin: 4px 0 4px 24px;
+  overflow: hidden;
+  animation: cardIn 0.3s ease;
+}
+
+.delegation-result.collapsed .dr-body {
+  display: none;
+}
+
+.dr-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 0.74rem;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+  background: var(--bg-secondary);
+}
+
+.dr-header:hover {
+  background: var(--bg-hover);
+}
+
+.dr-toggle {
+  font-size: 0.7rem;
+  transition: transform 0.15s ease;
+  width: 12px;
+  text-align: center;
+}
+
+.delegation-result:not(.collapsed) .dr-toggle {
+  transform: rotate(90deg);
+}
+
+.dr-agent {
+  color: var(--text-muted);
+}
+
+.dr-label {
+  color: var(--text-muted);
+}
+
+.dr-body {
+  padding: 8px 12px;
+  font-size: 0.78rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg-primary);
+}
+
+.dr-body .message-content {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
 /* ── Agent Activity (inside response) ───────────────── */
 
 .agent-activity {
@@ -1319,6 +1386,10 @@ body {
 
 .thinking-dots span:nth-child(2) { animation-delay: 0.15s; }
 .thinking-dots span:nth-child(3) { animation-delay: 0.3s; }
+
+.thinking-indicator.hidden {
+  display: none;
+}
 
 @keyframes thinkBounce {
   0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }

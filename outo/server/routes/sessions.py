@@ -24,10 +24,14 @@ def create_sessions_routes(app, sessions_dir: Path):
 
     @router.get("/api/session/{session_id}")
     async def get_session(session_id: str):
-        messages = load_session(session_id, sessions_dir)
-        if messages is None:
+        data = load_session(session_id, sessions_dir)
+        if data is None:
             raise HTTPException(status_code=404, detail="Session not found")
-        return {"session_id": session_id, "messages": messages}
+        return {
+            "session_id": session_id,
+            "messages": data["messages"],
+            "events": data["events"],
+        }
 
     @router.post("/api/sessions/clear")
     async def clear_session():
