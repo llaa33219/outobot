@@ -1,5 +1,85 @@
 # OutObot Changelog
 
+## 2026-03-22 - install.sh Fresh Sync on Update
+
+### Problem
+When running `install.sh` on an existing installation (update), old source files that were deleted in the new version would remain, causing stale files to accumulate.
+
+### Solution
+Updated `install.sh` to perform a fresh sync on update:
+
+1. **Detect update mode**: Check if `~/.outobot/.version` exists
+2. **Clean up old source files**: Remove all files/dirs except preserved user data
+3. **Fresh copy**: Copy all source files from the new version
+4. **Preserve user data**: `config/`, `skills/`, `sessions/`, `venv/`, `logs/`, `note/`, `.version`
+
+### Preserved on Update
+| Directory/File | Description |
+|----------------|-------------|
+| `config/` | User settings and API keys |
+| `skills/` | Synced skills from various agents |
+| `sessions/` | Conversation history |
+| `venv/` | Python virtual environment |
+| `logs/` | Log files |
+| `note/` | User notes |
+| `.version` | Version tracking |
+
+### Regenerated on Update
+| File | Action |
+|------|--------|
+| `run.sh` | Deleted and regenerated |
+| `uninstall.sh` | Deleted and regenerated |
+
+### Removed and Synced Fresh
+All other source files: `outo/`, `ai-docs/`, `static/`, `run.py`, `LICENSE`, `logo.svg`
+
+### Example Output (Update)
+```
+[2.5/6] Copying source files...
+  Cleaning up old source files for fresh sync...
+    Preserved: config/
+    Preserved: skills/
+    Preserved: sessions/
+    Removed: outo/ (will be synced fresh)
+    Synced: outo/
+    Synced: ai-docs/
+    Synced: static/
+    ...
+  Source files ready
+```
+
+---
+
+## 2026-03-22 - Skills Sync Subdirectories Fix
+
+### Problem
+Skills synced from agent tools (e.g., `~/.claude/skills/`, `~/.agents/skills/`) only copied `SKILL.md`, ignoring subdirectories like `rules/`, `references/`, `templates/`.
+
+### Solution
+Updated `sync_from_agents()` in `outo/skills.py` to recursively copy directories:
+
+```python
+for item in skill_dir.iterdir():
+    dest_item = dest_skill_dir / item.name
+    if item.is_file():
+        # Copy file with timestamp check
+        if not dest_item.exists() or item.stat().st_mtime > dest_item.stat().st_mtime:
+            shutil.copy2(item, dest_item)
+    elif item.is_dir():
+        # Recursively sync directories
+        if not dest_item.exists():
+            shutil.copytree(item, dest_item)
+        else:
+            _sync_directory(item, dest_item)
+```
+
+### Skills Now Syncing Fully
+- `agent-browser/` → `references/` (7 files), `templates/` (3 files)
+- `outocut/` → `rules/` (14 markdown files)
+- `remotion/` → `rules/` (26 files + nested `assets/` subdirectory)
+
+---
+
 ## 2026-03-18 - Frontend Agent Card Fix
 
 ### Problem

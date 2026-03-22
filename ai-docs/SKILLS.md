@@ -105,15 +105,20 @@ def scan_agent_skills(self) -> dict[str, list[Path]]:
 
 ## Skill File Structure
 
-Each skill should have:
+Each skill can have:
 
 ```
 skill-name/
 ├── SKILL.md          # Required - skill documentation
 ├── script.py         # Optional - skill code
 ├── config.json       # Optional - skill config
+├── rules/            # Optional - subdirectories with additional rules
+├── references/       # Optional - reference documentation
+├── templates/        # Optional - template files
 └── ...
 ```
+
+**Note:** When skills are synced from agent tools, all files AND subdirectories are copied to `~/.outobot/skills/<skill-name>/`. This includes directories like `rules/`, `references/`, `templates/`, and any nested subdirectories within them.
 
 ### SKILL.md Format
 

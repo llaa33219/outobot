@@ -128,6 +128,23 @@ def _normalize_sources(value: object) -> dict[str, bool]:
     return sources
 
 
+def _sync_directory(src: Path, dst: Path) -> None:
+    """Recursively sync directory contents, updating only changed files."""
+    for item in src.iterdir():
+        dest_item = dst / item.name
+        if item.is_file():
+            if (
+                not dest_item.exists()
+                or item.stat().st_mtime > dest_item.stat().st_mtime
+            ):
+                _ = shutil.copy2(item, dest_item)
+        elif item.is_dir():
+            if not dest_item.exists():
+                _ = shutil.copytree(item, dest_item)
+            else:
+                _sync_directory(item, dest_item)
+
+
 def _normalize_skill_record(value: object) -> SkillRecord | None:
     value_map = _as_str_object_dict(value)
     if not value_map:
@@ -393,13 +410,19 @@ class SkillsManager:
                     dest_skill_dir.mkdir(parents=True, exist_ok=True)
 
                     for item in skill_dir.iterdir():
+                        dest_item = dest_skill_dir / item.name
                         if item.is_file():
-                            dest_file = dest_skill_dir / item.name
                             if (
-                                not dest_file.exists()
-                                or item.stat().st_mtime > dest_file.stat().st_mtime
+                                not dest_item.exists()
+                                or item.stat().st_mtime > dest_item.stat().st_mtime
                             ):
-                                _ = shutil.copy2(item, dest_file)
+                                _ = shutil.copy2(item, dest_item)
+                        elif item.is_dir():
+                            if not dest_item.exists():
+                                _ = shutil.copytree(item, dest_item)
+                            else:
+                                # Recursively sync directory contents
+                                _ = _sync_directory(item, dest_item)
 
                     skill_md = skill_dir / "SKILL.md"
                     description = ""

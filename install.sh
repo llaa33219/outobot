@@ -137,52 +137,56 @@ else
 copy_source_files() {
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     
+    # Check if this is an update (existing installation)
+    IS_UPDATE=false
+    if [ -d "$OUTOBOT_DIR" ] && [ -f "$OUTOBOT_DIR/.version" ]; then
+        IS_UPDATE=true
+    fi
+    
     echo -e "\n${YELLOW}[2.5/6] Copying source files...${NC}"
     
-    # Copy run.py
-    if [ -f "$SCRIPT_DIR/run.py" ]; then
-        cp "$SCRIPT_DIR/run.py" "$OUTOBOT_DIR/"
-        echo -e "  Copied: run.py"
+    # On update: clean up old source files first for a fresh sync
+    # User data directories are preserved
+    if [ "$IS_UPDATE" = true ]; then
+        echo -e "  Cleaning up old source files for fresh sync..."
+        
+        for item in "$OUTOBOT_DIR"/*; do
+            [ -e "$item" ] || continue
+            basename_item=$(basename "$item")
+            
+            case "$basename_item" in
+                config|skills|sessions|venv|logs|note|.version)
+                    echo -e "    Preserved: $basename_item/"
+                    ;;
+                run.sh|uninstall.sh)
+                    rm -f "$item"
+                    echo -e "    Removed: $basename_item (will be regenerated)"
+                    ;;
+                *)
+                    if [ -d "$item" ]; then
+                        rm -rf "$item"
+                        echo -e "    Removed: $basename_item/"
+                    else
+                        rm -f "$item"
+                        echo -e "    Removed: $basename_item"
+                    fi
+                    ;;
+            esac
+        done
     fi
     
-    # Copy outo module
-    if [ -d "$SCRIPT_DIR/outo" ]; then
-        cp -r "$SCRIPT_DIR/outo" "$OUTOBOT_DIR/"
-        echo -e "  Copied: outo/ (module)"
-    fi
+    # Copy source files fresh
+    SYNC_ITEMS="run.py outo LICENSE ai-docs logo.svg static uninstall.sh"
     
-    # Copy LICENSE
-    if [ -f "$SCRIPT_DIR/LICENSE" ]; then
-        cp "$SCRIPT_DIR/LICENSE" "$OUTOBOT_DIR/"
-        echo -e "  Copied: LICENSE"
-    fi
+    for item in $SYNC_ITEMS; do
+        if [ -e "$SCRIPT_DIR/$item" ]; then
+            cp -r "$SCRIPT_DIR/$item" "$OUTOBOT_DIR/"
+            echo -e "  Synced: $item"
+        fi
+    done
     
-    # Copy ai-docs
-    if [ -d "$SCRIPT_DIR/ai-docs" ]; then
-        cp -r "$SCRIPT_DIR/ai-docs" "$OUTOBOT_DIR/"
-        echo -e "  Copied: ai-docs/"
-    fi
-    
-    # Copy logo.svg
-    if [ -f "$SCRIPT_DIR/logo.svg" ]; then
-        cp "$SCRIPT_DIR/logo.svg" "$OUTOBOT_DIR/"
-        echo -e "  Copied: logo.svg"
-    fi
-    
+    # Ensure note directory exists
     mkdir -p "$OUTOBOT_DIR/note"
-    echo -e "  Created: note/"
-    
-    # Copy static directory (frontend)
-    if [ -d "$SCRIPT_DIR/static" ]; then
-        cp -r "$SCRIPT_DIR/static" "$OUTOBOT_DIR/"
-        echo -e "  Copied: static/ (frontend)"
-    fi
-    
-    # Copy uninstall script
-    if [ -f "$SCRIPT_DIR/uninstall.sh" ]; then
-        cp "$SCRIPT_DIR/uninstall.sh" "$OUTOBOT_DIR/"
-        echo -e "  Copied: uninstall.sh"
-    fi
     
     echo -e "  Source files ready"
 }

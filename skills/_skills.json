@@ -40,6 +40,16 @@
       "sources": [
         "agents"
       ]
+    },
+    {
+      "name": "outocut",
+      "description": "OutOcut video editor - CLI commands, JSON project format (.outocut), animation system, effects, blend modes, and AI visual self-verification workflow",
+      "agents": [],
+      "enabled": true,
+      "file": "outocut/SKILL.md",
+      "sources": [
+        "agents"
+      ]
     }
   ],
   "sources": []
