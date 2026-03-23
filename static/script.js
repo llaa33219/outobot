@@ -755,7 +755,23 @@ class OutObotChat {
     if (welcome) welcome.classList.add('hidden');
     
     if (data.events && data.events.length > 0) {
-      this.replaySession(data.events);
+      const migratedEvents = data.events.map(event => {
+        if (event.type === 'finish') {
+          if (event.output !== undefined && event.data === undefined) {
+            return {
+              type: event.type,
+              agent_name: event.agent_name || 'outo',
+              data: {
+                message: event.output,
+                output: event.output,
+                session_id: event.session_id
+              }
+            };
+          }
+        }
+        return event;
+      });
+      this.replaySession(migratedEvents);
     } else {
       const existingContainer = this.els.chatArea.querySelector('.message-container');
       if (existingContainer) existingContainer.remove();
@@ -796,6 +812,7 @@ class OutObotChat {
     this.els.chatArea.appendChild(container);
     
     this.ensureAgentBubble('outo');
+    this.hasStreamedTopLevel = true;
     
     events.forEach((event, index) => {
       setTimeout(() => {
@@ -1207,11 +1224,66 @@ class OutObotChat {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
   }
 
-  renderMarkdown(text) {
+  _splitReasoningTags(text) {
+    const pattern = /<(think|reasoning|thought)>([\s\S]*?)<\/\1>/gi;
+    const segments = [];
+    let lastIndex = 0;
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        const before = text.slice(lastIndex, match.index);
+        if (before.trim()) segments.push({ type: 'text', content: before });
+      }
+      segments.push({ type: 'reasoning', content: match[2] });
+      lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < text.length) {
+      const remaining = text.slice(lastIndex);
+      const unclosed = remaining.match(/<(think|reasoning|thought)>([\s\S]*)$/i);
+      if (unclosed) {
+        const before = remaining.slice(0, unclosed.index);
+        if (before.trim()) segments.push({ type: 'text', content: before });
+        segments.push({ type: 'reasoning', content: unclosed[2] });
+      } else if (remaining.trim()) {
+        segments.push({ type: 'text', content: remaining });
+      }
+    }
+    return segments.length > 0 ? segments : [{ type: 'text', content: text }];
+  }
+
+  _renderMarkdownInner(text) {
     if (typeof marked !== 'undefined') {
-      return marked.parse(text || '');
+      try {
+        let html = marked.parse(text || '');
+        if (typeof hljs !== 'undefined') {
+          const temp = document.createElement('div');
+          temp.innerHTML = html;
+          temp.querySelectorAll('pre code').forEach((block) => {
+            hljs.highlightElement(block);
+          });
+          html = temp.innerHTML;
+        }
+        return html;
+      } catch (e) {
+        console.warn('marked.parse failed, using fallback:', e);
+      }
     }
     return this.escapeHTML(text || '');
+  }
+
+  renderMarkdown(text) {
+    const segments = this._splitReasoningTags(text);
+    let html = '';
+    for (const seg of segments) {
+      if (seg.type === 'reasoning') {
+        html += '<details class="reasoning-block"><summary class="reasoning-summary">' +
+          '🧠 Reasoning</summary><div class="reasoning-content">' +
+          this._renderMarkdownInner(seg.content) + '</div></details>';
+      } else {
+        html += this._renderMarkdownInner(seg.content);
+      }
+    }
+    return html;
   }
 
   addMessageTrail() {

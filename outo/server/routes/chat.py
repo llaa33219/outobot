@@ -5,6 +5,7 @@ OutObot Server Routes - Chat endpoints (streaming, regular, websocket)
 import json
 from pathlib import Path
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -52,8 +53,8 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
             message_with_attachments = request.message + attachment_info
 
         async def event_generator():
-            from agentouto.message import Message
-            from agentouto.streaming import async_run_stream
+            from agentouto.message import Message  # pyright: ignore[reportMissingImports]
+            from agentouto.streaming import async_run_stream  # pyright: ignore[reportMissingImports]
 
             current_agent_manager = state_agent_manager
 
@@ -123,7 +124,8 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                 if event.type == "token":
                     event_data = {
                         "type": "token",
-                        "content": event.data.get("token", ""),
+                        "agent_name": event.agent_name,
+                        "data": {"content": event.data.get("text", "")},
                     }
                 elif event.type == "tool_call":
                     tool_name = event.data.get("name", "tool")
@@ -135,8 +137,12 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                             else str(tool_args)
                         )
                     event_data = {
-                        "type": "tool",
-                        "content": f"🔧 [{event.agent_name}] Calling tool: {tool_name}\n   Args: {tool_args}",
+                        "type": "tool_call",
+                        "agent_name": event.agent_name,
+                        "data": {
+                            "tool_name": tool_name,
+                            "arguments": tool_args,
+                        },
                     }
                     # Collect raw event for replay
                     events.append(
@@ -153,11 +159,10 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     if isinstance(result, str):
                         result = result[:200] + "..." if len(result) > 200 else result
                     event_data = {
-                        "type": "tool",
-                        "content": f"✅ [{event.agent_name}] Tool result: {result}",
+                        "type": "tool_result",
+                        "agent_name": event.agent_name,
+                        "data": {"result": result},
                     }
-                    if attachments:
-                        event_data["attachments"] = attachments
                     # Collect raw event for replay
                     events.append(
                         {
@@ -175,8 +180,13 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     message = event.data.get("message", "")[:100]
                     pending_delegations[target] = event.agent_name
                     event_data = {
-                        "type": "agent",
-                        "content": f"📤 [{event.agent_name}] → Delegating to: {target}\n   Message: {message}...",
+                        "type": "agent_call",
+                        "agent_name": event.agent_name,
+                        "data": {
+                            "agent_name": event.agent_name,
+                            "from": target,
+                            "message": message,
+                        },
                     }
                     # Collect raw event for replay
                     events.append(
@@ -196,8 +206,9 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                         result = result[:500] + "..." if len(result) > 500 else result
                     caller = pending_delegations.pop(event.agent_name, event.agent_name)
                     event_data = {
-                        "type": "agent",
-                        "content": f"📥 [{event.agent_name}] ← Returned from: {event.agent_name}\n   Result: {result}",
+                        "type": "agent_return",
+                        "agent_name": event.agent_name,
+                        "data": {"result": result},
                     }
                     # Collect raw event for replay
                     events.append(
@@ -221,7 +232,8 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     thinking = event.data.get("thinking", "")
                     event_data = {
                         "type": "thinking",
-                        "content": f"💭 [{event.agent_name}] Thinking: {thinking}",
+                        "agent_name": event.agent_name,
+                        "data": {"content": thinking},
                     }
                     # Collect raw event for replay
                     events.append(
@@ -235,7 +247,8 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     error = event.data.get("error", "Unknown error")
                     event_data = {
                         "type": "error",
-                        "content": f"❌ [{event.agent_name}] Error: {error}",
+                        "agent_name": event.agent_name,
+                        "data": {"message": error},
                     }
                     # Collect raw event for replay
                     events.append(
@@ -249,8 +262,12 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     output = event.data.get("output", "")
                     event_data = {
                         "type": "finish",
-                        "output": output,
-                        "session_id": session_id,
+                        "agent_name": event.agent_name,
+                        "data": {
+                            "message": output,
+                            "output": output,
+                            "session_id": session_id,
+                        },
                     }
                     # Collect raw event for replay
                     events.append(
@@ -278,8 +295,8 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
 
     @router.post("/api/chat")
     async def chat(request: ChatMessage, req: Request):
-        from agentouto import async_run
-        from agentouto.message import Message
+        from agentouto.message import Message  # pyright: ignore[reportMissingImports]
+        from agentouto.streaming import async_run_stream  # pyright: ignore[reportMissingImports]
 
         state_agent_manager = getattr(req.app.state, "agent_manager", None)
 
@@ -311,6 +328,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
 
         history = None
         session_id = request.session_id
+        session_messages = []
 
         if session_id:
             raw_history = load_session(session_id, sessions_dir)
@@ -330,43 +348,23 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                             content=msg.get("content", ""),
                         )
                     )
+                # Add category to loaded messages if not present (backward compat)
+                for msg in raw_history.get("messages", []):
+                    if "category" not in msg:
+                        if msg.get("sender") == "You":
+                            msg["category"] = "user"
+                        elif msg.get("sender") == request.agent:
+                            msg["category"] = "top-level"
+                        else:
+                            msg["category"] = "loop-internal"
+                    session_messages.append(msg)
             else:
                 session_id = None
 
         session_id = session_id or f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-        result = await async_run(
-            entry=agent,
-            message=message_with_attachments,
-            agents=list(state_agent_manager.get_all_agents().values()),
-            tools=DEFAULT_TOOLS,
-            providers=list(provider_manager.providers.values()),
-            history=history,
-        )
-
-        messages = []
-        if history:
-            for msg in history:
-                if isinstance(msg, Message):
-                    # Determine category from message type
-                    if msg.type == "return":
-                        msg_category = "top-level"
-                    elif msg.sender == "You":
-                        msg_category = "user"
-                    else:
-                        msg_category = "loop-internal"
-                    messages.append(
-                        {
-                            "sender": msg.sender,
-                            "content": msg.content,
-                            "timestamp": datetime.now().isoformat(),
-                            "category": msg_category,
-                        }
-                    )
-                else:
-                    messages.append(msg)
-
-        messages.append(
+        # Add user message to session
+        session_messages.append(
             {
                 "sender": "You",
                 "content": request.message,
@@ -375,34 +373,143 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
             }
         )
 
-        messages.append(
-            {
-                "sender": request.agent,
-                "content": result.output,
-                "timestamp": datetime.now().isoformat(),
-                "category": "top-level",
-            }
-        )
+        # Track pending delegations for caller→target mapping
+        pending_delegations = {}
+        # Collect raw events for session replay
+        events = []
+        output = None
 
-        save_session(session_id, messages, sessions_dir)
+        async for event in async_run_stream(
+            entry=agent,
+            message=message_with_attachments,
+            agents=list(state_agent_manager.get_all_agents().values()),
+            tools=DEFAULT_TOOLS,
+            providers=list(provider_manager.providers.values()),
+            history=history,
+        ):
+            if event.type == "finish":
+                output = event.data.get("output", "")
+                events.append(
+                    {
+                        "type": "finish",
+                        "agent_name": request.agent,
+                        "data": {"output": output, "session_id": session_id},
+                    }
+                )
+                # Save agent top-level response to session
+                session_messages.append(
+                    {
+                        "sender": request.agent,
+                        "content": output,
+                        "timestamp": datetime.now().isoformat(),
+                        "category": "top-level",
+                    }
+                )
+            elif event.type == "tool_call":
+                tool_name = event.data.get("name", "tool")
+                tool_args = event.data.get("arguments", "")
+                if isinstance(tool_args, dict):
+                    tool_args = (
+                        str(tool_args)[:100] + "..."
+                        if len(str(tool_args)) > 100
+                        else str(tool_args)
+                    )
+                events.append(
+                    {
+                        "type": "tool_call",
+                        "agent_name": event.agent_name,
+                        "data": {"tool_name": tool_name, "arguments": tool_args},
+                    }
+                )
+            elif event.type == "tool_result":
+                events.append(
+                    {
+                        "type": "tool_result",
+                        "agent_name": event.agent_name,
+                        "data": {
+                            "result": event.data.get("result", ""),
+                            "tool_name": event.data.get("tool_name", "tool"),
+                        },
+                    }
+                )
+            elif event.type == "agent_call":
+                events.append(
+                    {
+                        "type": "agent_call",
+                        "agent_name": event.agent_name,
+                        "data": {
+                            "agent_name": event.agent_name,
+                            "from": event.data.get("target", ""),
+                            "message": event.data.get("message", "")[:100],
+                        },
+                    }
+                )
+            elif event.type == "agent_return":
+                events.append(
+                    {
+                        "type": "agent_return",
+                        "agent_name": event.agent_name,
+                        "data": {
+                            "result": event.data.get("result", ""),
+                            "caller": pending_delegations.get(
+                                event.agent_name, event.agent_name
+                            ),
+                        },
+                    }
+                )
+                # Save agent delegation result as loop-internal to session
+                result_content = event.data.get("result", "")
+                caller = pending_delegations.get(event.agent_name, event.agent_name)
+                session_messages.append(
+                    {
+                        "sender": event.agent_name,
+                        "caller": caller,
+                        "content": result_content,
+                        "timestamp": datetime.now().isoformat(),
+                        "category": "loop-internal",
+                    }
+                )
+            elif event.type == "thinking":
+                events.append(
+                    {
+                        "type": "thinking",
+                        "agent_name": event.agent_name,
+                        "data": {"content": event.data.get("thinking", "")},
+                    }
+                )
+            elif event.type == "error":
+                events.append(
+                    {
+                        "type": "error",
+                        "agent_name": event.agent_name,
+                        "data": {"message": event.data.get("error", "Unknown error")},
+                    }
+                )
+
+        # Fallback if no output was captured
+        if output is None:
+            output = ""
+
+        # Save session with events for replay
+        save_session(session_id, session_messages, sessions_dir, events)
 
         return {
-            "output": result.output,
+            "output": output,
             "session_id": session_id,
             "status": "Completed",
         }
 
     @router.websocket("/ws/chat")
     async def websocket_chat(ws: WebSocket):
-        from agentouto.message import Message
-        from agentouto.streaming import async_run_stream
+        from agentouto.message import Message  # pyright: ignore[reportMissingImports]
+        from agentouto.streaming import async_run_stream  # pyright: ignore[reportMissingImports]
 
         await ws.accept()
         closed = False
 
         state_agent_manager = getattr(app.state, "agent_manager", None)
 
-        async def safe_send(payload: dict) -> bool:
+        async def safe_send(payload: dict[str, Any]) -> bool:
             nonlocal closed
             if closed:
                 return False
@@ -650,7 +757,11 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                             event_data = {
                                 "type": "finish",
                                 "agent_name": event.agent_name,
-                                "data": {"message": output, "session_id": session_id},
+                                "data": {
+                                    "message": output,
+                                    "output": output,
+                                    "session_id": session_id,
+                                },
                             }
                             events.append(event_data)
 
