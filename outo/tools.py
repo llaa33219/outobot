@@ -3,11 +3,13 @@ OutObot Tools
 Default tools available to all agents
 """
 
+import base64
 import json
 import os
+import tempfile
 from pathlib import Path
 from typing import Annotated
-from agentouto import Tool
+from agentouto import Tool, ToolResult, Attachment
 
 # Sessions directory - configured to ~/.outobot/sessions
 SESSIONS_DIR = Path.home() / ".outobot" / "sessions"
@@ -179,17 +181,22 @@ def search_code(
 @Tool
 def view_media(
     path: Annotated[str, "File path to the media file (image, video, or audio)"],
-) -> str:
-    """View and analyze media files (images, videos, audio). Returns metadata and basic analysis."""
-    import os
-    from pathlib import Path
+) -> ToolResult:
+    """View and analyze media files (images, videos, audio). Returns metadata and basic analysis.
+
+    Returns a ToolResult with:
+    - content: Text metadata (dimensions, format, codec, duration, etc.)
+    - attachments: Actual media file (image, video frame, or audio) for visual/audio analysis
+    """
+    import subprocess
+    from PIL import Image
 
     if not os.path.exists(path):
-        return f"Error: File not found: {path}"
+        return ToolResult(content=f"Error: File not found: {path}")
 
     file_path = Path(path)
     if not file_path.exists():
-        return f"Error: File does not exist: {path}"
+        return ToolResult(content=f"Error: File does not exist: {path}")
 
     file_ext = file_path.suffix.lower()
     file_size = os.path.getsize(path)
@@ -199,34 +206,68 @@ def view_media(
         else f"{file_size / (1024 * 1024):.1f} MB"
     )
 
-    result = f"File: {file_path.name}\n"
-    result += f"Path: {path}\n"
-    result += f"Size: {file_size_str}\n"
-    result += f"Type: {file_ext[1:] if file_ext else 'unknown'}\n"
+    content = f"File: {file_path.name}\n"
+    content += f"Path: {path}\n"
+    content += f"Size: {file_size_str}\n"
+    content += f"Type: {file_ext[1:] if file_ext else 'unknown'}\n"
+
+    attachments = []
 
     image_exts = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff", ".ico"]
     video_exts = [".mp4", ".avi", ".mov", ".mkv", ".webm", ".flv", ".wmv", ".m4v"]
     audio_exts = [".mp3", ".wav", ".flac", ".aac", ".ogg", ".m4a", ".wma", ".opus"]
 
+    # MIME type mapping
+    mime_types = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".gif": "image/gif",
+        ".bmp": "image/bmp",
+        ".webp": "image/webp",
+        ".tiff": "image/tiff",
+        ".ico": "image/x-icon",
+        ".mp4": "video/mp4",
+        ".avi": "video/x-msvideo",
+        ".mov": "video/quicktime",
+        ".mkv": "video/x-matroska",
+        ".webm": "video/webm",
+        ".flv": "video/x-flv",
+        ".wmv": "video/x-ms-wmv",
+        ".m4v": "video/x-m4v",
+        ".mp3": "audio/mpeg",
+        ".wav": "audio/wav",
+        ".flac": "audio/flac",
+        ".aac": "audio/aac",
+        ".ogg": "audio/ogg",
+        ".m4a": "audio/mp4",
+        ".wma": "audio/x-ms-wma",
+        ".opus": "audio/opus",
+    }
+
     if file_ext in image_exts:
         try:
-            from PIL import Image
-
             with Image.open(path) as img:
-                result += f"Dimensions: {img.width} x {img.height} pixels\n"
-                result += f"Format: {img.format}\n"
-                result += f"Mode: {img.mode}\n"
-                if hasattr(img, "info"):
-                    if "dpi" in img.info:
-                        result += f"DPI: {img.info['dpi']}\n"
+                content += f"Dimensions: {img.width} x {img.height} pixels\n"
+                content += f"Format: {img.format}\n"
+                content += f"Mode: {img.mode}\n"
+                if hasattr(img, "info") and "dpi" in img.info:
+                    content += f"DPI: {img.info['dpi']}\n"
+
+            # Attach the actual image for visual analysis
+            with open(path, "rb") as f:
+                img_data = base64.b64encode(f.read()).decode("utf-8")
+            mime_type = mime_types.get(file_ext, "image/png")
+            attachments.append(
+                Attachment(mime_type=mime_type, data=img_data, name=file_path.name)
+            )
+
         except Exception as e:
-            result += f"Image analysis error: {str(e)}\n"
+            content += f"Image analysis error: {str(e)}\n"
 
     elif file_ext in video_exts:
-        result += "Video file detected. "
+        content += "Video file detected. "
         try:
-            import subprocess
-
             probe = subprocess.run(
                 [
                     "ffprobe",
@@ -243,31 +284,45 @@ def view_media(
                 timeout=10,
             )
             if probe.returncode == 0:
-                import json
-
                 data = json.loads(probe.stdout)
                 if "streams" in data:
                     for stream in data["streams"]:
                         if "width" in stream:
-                            result += f"\nResolution: {stream.get('width', '?')}x{stream.get('height', '?')}\n"
+                            content += f"\nResolution: {stream.get('width', '?')}x{stream.get('height', '?')}\n"
                         if "codec_name" in stream:
-                            result += f"Codec: {stream.get('codec_name')}\n"
+                            content += f"Codec: {stream.get('codec_name')}\n"
                         if "bit_rate" in stream:
                             br = int(stream.get("bit_rate", 0))
-                            result += f"Bitrate: {br // 1000} kbps\n"
-                if "format" in data:
-                    if "duration" in data["format"]:
-                        result += f"Duration: {float(data['format']['duration']):.1f} seconds\n"
+                            content += f"Bitrate: {br // 1000} kbps\n"
+                if "format" in data and "duration" in data["format"]:
+                    content += (
+                        f"Duration: {float(data['format']['duration']):.1f} seconds\n"
+                    )
+
+            # Attach the full video file for analysis (limit to 50MB to avoid memory issues)
+            if file_size < 50 * 1024 * 1024:
+                with open(path, "rb") as f:
+                    video_data = base64.b64encode(f.read()).decode("utf-8")
+                mime_type = mime_types.get(file_ext, "video/mp4")
+                attachments.append(
+                    Attachment(
+                        mime_type=mime_type,
+                        data=video_data,
+                        name=file_path.name,
+                    )
+                )
+                content += "\n[Full video attached for analysis]"
+            else:
+                content += "\n[Video too large to attach - showing metadata only]"
+
         except FileNotFoundError:
-            result += "\nffprobe not available. Install ffmpeg for detailed video info."
+            content += "\nffprobe/ffmpeg not available. Install ffmpeg for detailed video info."
         except Exception as e:
-            result += f"\nVideo analysis error: {str(e)}\n"
+            content += f"\nVideo analysis error: {str(e)}\n"
 
     elif file_ext in audio_exts:
-        result += "Audio file detected. "
+        content += "Audio file detected. "
         try:
-            import subprocess
-
             probe = subprocess.run(
                 [
                     "ffprobe",
@@ -286,38 +341,58 @@ def view_media(
                 timeout=10,
             )
             if probe.returncode == 0:
-                import json
-
                 data = json.loads(probe.stdout)
                 if "streams" in data:
                     for stream in data["streams"]:
                         if "sample_rate" in stream:
-                            result += f"\nSample Rate: {stream.get('sample_rate')} Hz\n"
+                            content += (
+                                f"\nSample Rate: {stream.get('sample_rate')} Hz\n"
+                            )
                         if "channels" in stream:
                             ch = stream.get("channels", 0)
-                            ch_str = f"{ch} channel"
                             if ch == 1:
                                 ch_str = "Mono"
                             elif ch == 2:
                                 ch_str = "Stereo"
-                            result += f"Channels: {ch_str}\n"
+                            else:
+                                ch_str = f"{ch} channel"
+                            content += f"Channels: {ch_str}\n"
                         if "codec_name" in stream:
-                            result += f"Codec: {stream.get('codec_name')}\n"
+                            content += f"Codec: {stream.get('codec_name')}\n"
                 if "format" in data and "duration" in data["format"]:
-                    result += (
+                    content += (
                         f"Duration: {float(data['format']['duration']):.1f} seconds\n"
                     )
+
+            # Attach the actual audio file for analysis
+            # Skip if file is too large (> 10MB)
+            if file_size < 10 * 1024 * 1024:
+                with open(path, "rb") as f:
+                    audio_data = base64.b64encode(f.read()).decode("utf-8")
+                mime_type = mime_types.get(file_ext, "audio/mpeg")
+                attachments.append(
+                    Attachment(
+                        mime_type=mime_type, data=audio_data, name=file_path.name
+                    )
+                )
+                content += "\n[Audio file attached for analysis]"
+            else:
+                content += "\n[Audio file too large to attach for analysis]"
+
         except FileNotFoundError:
-            result += "\nffprobe not available. Install ffmpeg for detailed audio info."
+            content += (
+                "\nffprobe not available. Install ffmpeg for detailed audio info."
+            )
         except Exception as e:
-            result += f"\nAudio analysis error: {str(e)}\n"
+            content += f"\nAudio analysis error: {str(e)}\n"
 
     else:
-        result += (
+        content += (
             "\nUnsupported media type. Try with a known image, video, or audio format."
         )
+        return ToolResult(content=content)
 
-    return result
+    return ToolResult(content=content, attachments=attachments if attachments else None)
 
 
 DEFAULT_TOOLS = [

@@ -25,16 +25,44 @@ if [ ! -d "$OUTOBOT_DIR" ]; then
     exit 0
 fi
 
-echo -e "${YELLOW}This will remove:${NC}"
-echo "  - $OUTOBOT_DIR (all data including sessions, config, logs)"
-echo "  - $SYSTEMD_SERVICE (if exists)"
-echo "  - Any symlinks to skills directories"
-echo ""
+# Check for non-interactive mode (for scripted use)
+NON_INTERACTIVE=false
+FORCE_REMOVE=false
 
-read -p "Are you sure you want to uninstall OutObot? (yes/no): " confirm
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -y|--yes)
+            FORCE_REMOVE=true
+            ;;
+        -f|--force)
+            FORCE_REMOVE=true
+            ;;
+        -n|--non-interactive)
+            NON_INTERACTIVE=true
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+    shift
+done
 
-if [ "$confirm" != "yes" ]; then
-    echo "Cancelled."
+if [ "$FORCE_REMOVE" = false ] && [ "$NON_INTERACTIVE" = false ]; then
+    echo -e "${YELLOW}This will remove:${NC}"
+    echo "  - $OUTOBOT_DIR (all data including sessions, config, logs)"
+    echo "  - $SYSTEMD_SERVICE (if exists)"
+    echo "  - Any symlinks to skills directories"
+    echo ""
+
+    read -p "Are you sure you want to uninstall OutObot? (yes/no): " confirm
+
+    if [ "$confirm" != "yes" ]; then
+        echo "Cancelled."
+        exit 0
+    fi
+elif [ "$FORCE_REMOVE" = false ]; then
+    echo "Cancelled (non-interactive mode without --force or --yes)."
     exit 0
 fi
 

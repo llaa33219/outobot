@@ -136,33 +136,35 @@ results = search_code("async def", path="/home/user/project", file_pattern="*.py
 
 ### view_media
 
-View and analyze media files (images, videos, audio). Returns metadata and basic analysis.
+View and analyze media files (images, videos, audio). Returns metadata and basic analysis, with the actual media file attached for visual/audio analysis.
 
 ```python
 @Tool
 def view_media(
     path: Annotated[str, "File path to the media file"],
-) -> str:
+) -> ToolResult:
 ```
 
 **Parameters:**
 - `path` (string): Absolute or relative file path to the media file
 
-**Returns:** Media file metadata including:
-- **Images**: Dimensions, format, color mode, DPI
-- **Videos**: Resolution, codec, bitrate, duration
-- **Audio**: Sample rate, channels, codec, duration
+**Returns:** `ToolResult` with:
+- **content**: Media file metadata including:
+  - **Images**: Dimensions, format, color mode, DPI
+  - **Videos**: Resolution, codec, bitrate, duration
+  - **Audio**: Sample rate, channels, codec, duration
+- **attachments**: Actual media file (image, video, or audio) for visual/audio analysis
 
 **Supported Formats:**
 - Images: jpg, jpeg, png, gif, bmp, webp, tiff, ico
-- Videos: mp4, avi, mov, mkv, webm, flv, wmv, m4v
-- Audio: mp3, wav, flac, aac, ogg, m4a, wma, opus
+- Videos: mp4, avi, mov, mkv, webm, flv, wmv, m4v (full file attached, max 50MB)
+- Audio: mp3, wav, flac, aac, ogg, m4a, wma, opus (full file attached, max 10MB)
 
 **Example:**
 ```python
 result = view_media("/home/luke/.outobot/uploads/image.png")
-# Returns: File: image.png, Path: ..., Size: 1.2 MB, Type: png
-# Dimensions: 1920 x 1080 pixels, Format: PNG, Mode: RGB
+# result.content: "File: image.png, Path: ..., Size: 1.2 MB, Type: png\nDimensions: 1920 x 1080 pixels..."
+# result.attachments: [Attachment(mime_type="image/png", data="...", name="image.png")]
 ```
 
 **Note:** Requires Pillow for images and ffmpeg (ffprobe) for video/audio analysis.

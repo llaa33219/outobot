@@ -20,7 +20,7 @@ echo -e "${GREEN}========================================${NC}"
 echo ""
 
 echo -e "${YELLOW}[1/2] Uninstalling...${NC}"
-bash "$SCRIPT_DIR/uninstall.sh"
+bash "$SCRIPT_DIR/uninstall.sh" --force
 
 echo ""
 echo -e "${YELLOW}[2/2] Installing fresh...${NC}"

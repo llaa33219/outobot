@@ -63,7 +63,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                 raw_history = load_session(request.session_id, sessions_dir)
                 if raw_history:
                     history = []
-                    for msg in raw_history:
+                    for msg in raw_history.get("messages", []):
                         msg_type = (
                             "forward"
                             if msg.get("sender") != request.agent
@@ -81,7 +81,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                         )
                     # Add category to loaded messages if not present (backward compat)
                     session_messages = []
-                    for msg in raw_history:
+                    for msg in raw_history.get("messages", []):
                         if "category" not in msg:
                             if msg.get("sender") == "You":
                                 msg["category"] = "user"
@@ -148,18 +148,26 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     )
                 elif event.type == "tool_result":
                     result = event.data.get("result", "")
+                    tool_name = event.data.get("tool_name", "tool")
+                    attachments = event.data.get("attachments")
                     if isinstance(result, str):
                         result = result[:200] + "..." if len(result) > 200 else result
                     event_data = {
                         "type": "tool",
                         "content": f"✅ [{event.agent_name}] Tool result: {result}",
                     }
+                    if attachments:
+                        event_data["attachments"] = attachments
                     # Collect raw event for replay
                     events.append(
                         {
                             "type": "tool_result",
                             "agent_name": event.agent_name,
-                            "data": {"result": result},
+                            "data": {
+                                "result": result,
+                                "tool_name": tool_name,
+                                "attachments": attachments,
+                            },
                         }
                     )
                 elif event.type == "agent_call":
@@ -308,7 +316,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
             raw_history = load_session(session_id, sessions_dir)
             if raw_history:
                 history = []
-                for msg in raw_history:
+                for msg in raw_history.get("messages", []):
                     msg_type = (
                         "forward" if msg.get("sender") != request.agent else "return"
                     )
@@ -486,7 +494,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     raw_history = load_session(session_id, sessions_dir)
                     if raw_history:
                         history = []
-                        for msg in raw_history:
+                        for msg in raw_history.get("messages", []):
                             msg_type = (
                                 "forward"
                                 if msg.get("sender") != agent_name
@@ -504,7 +512,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                             )
                         # Add category to loaded messages if not present (backward compat)
                         session_messages = []
-                        for msg in raw_history:
+                        for msg in raw_history.get("messages", []):
                             if "category" not in msg:
                                 if msg.get("sender") == "You":
                                     msg["category"] = "user"

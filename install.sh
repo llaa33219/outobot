@@ -185,6 +185,10 @@ copy_source_files() {
         fi
     done
     
+    # Clean up Python bytecode cache to prevent stale .pyc issues
+    find "$OUTOBOT_DIR" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+    find "$OUTOBOT_DIR" -name "*.pyc" -delete 2>/dev/null || true
+    
     # Ensure note directory exists
     mkdir -p "$OUTOBOT_DIR/note"
     

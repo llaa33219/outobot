@@ -62,6 +62,7 @@ class OutObotChat {
     this.ws = null;
     this.reconnectDelay = 1000;
     this.maxReconnectDelay = 10000;
+    this.reconnecting = false;
     this.currentBubble = null;
     this.currentContentEl = null;
     this.currentActivityEl = null;
@@ -208,6 +209,7 @@ class OutObotChat {
     this.ws.onopen = () => {
       this.updateConnectionStatus('connected');
       this.reconnectDelay = 1000;
+      this.reconnecting = false;
       this.logActivity('Connected to server');
     };
 
@@ -217,6 +219,7 @@ class OutObotChat {
         this.setProcessing(false);
         this.deactivateAllAgents();
       }
+      this.reconnecting = true;
       setTimeout(() => {
         this.reconnectDelay = Math.min(this.reconnectDelay * 1.5, this.maxReconnectDelay);
         this.connectWebSocket();
@@ -356,9 +359,10 @@ class OutObotChat {
           break;
         }
         this.ensureAgentBubble(agent);
-        if (!this.hasStreamedTopLevel && data.message) {
+        const output = data.output || '';
+        if (!this.hasStreamedTopLevel && output) {
           this.ensureTextSegment();
-          this.currentTextSegment.innerHTML = this.renderMarkdown(data.message);
+          this.currentTextSegment.innerHTML = this.renderMarkdown(output);
           this.currentTextSegment = null;
           this.currentSegmentText = '';
         } else {
@@ -380,7 +384,7 @@ class OutObotChat {
           this.currentTextSegment = null;
         }
         const mainTokens = this.agentTokens[agent] || '';
-        const mainReturn = data.message || '';
+        const mainReturn = data.output || '';
         if (this.hasStreamedTopLevel && mainReturn.trim() && mainReturn.trim() !== mainTokens.trim()) {
           const returnSection = document.createElement('div');
           returnSection.className = 'ic-section ic-result-section visible main-return-section';
@@ -727,6 +731,20 @@ class OutObotChat {
   async loadSessionData(sessionId) {
     this.currentSession = sessionId;
     
+    this.currentBubble = null;
+    this.currentContentEl = null;
+    this.currentActivityEl = null;
+    this.contentStreamEl = null;
+    this.currentTextSegment = null;
+    this.currentSegmentText = '';
+    this.hasStreamedTopLevel = false;
+    this.agentTokens = {};
+    this.subAgentCards = {};
+    this.callStack = [];
+    this.agentStartTimes = {};
+    
+    this.els.chatArea.querySelectorAll('.message, .agent-card, .tool-card, .interaction-card').forEach(el => el.remove());
+    
     const data = await this.loadSession(sessionId);
     if (!data || !data.messages) {
       this.logActivity('Failed to load session', 'error');
@@ -792,8 +810,8 @@ class OutObotChat {
   async sendMessage() {
     const text = this.els.messageInput.value.trim();
     if (!text || this.processing) return;
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      this.showError('Not connected to server.');
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN || this.reconnecting) {
+      this.showError('Not connected to server. Please wait...');
       return;
     }
 
