@@ -68,6 +68,7 @@ Sessions are stored in `~/.outobot/sessions/` as JSON files.
       "type": "finish",
       "agent_name": "outo",
       "data": {
+        "message": "Based on the research, here's my analysis...",
         "output": "Based on the research, here's my analysis...",
         "session_id": "session_20260315_143022"
       }
@@ -226,7 +227,7 @@ Real-time bidirectional chat with automatic session management.
 - `agent_return`: Agent delegation complete `{"type": "agent_return", "agent_name": "...", "data": {"result": "...", "caller": "..."}}`
 - `thinking`: Reasoning output `{"type": "thinking", "agent_name": "...", "data": {"content": "..."}}`
 - `error`: Error message `{"type": "error", "agent_name": "...", "data": {"message": "..."}}`
-- `finish`: Response complete (triggers session save) `{"type": "finish", "agent_name": "...", "data": {"output": "...", "session_id": "..."}}`
+- `finish`: Response complete (triggers session save) `{"type": "finish", "agent_name": "...", "data": {"message": "...", "output": "...", "session_id": "..."}}`
 
 **Session Behavior:**
 - New session created if session_id is empty/null
@@ -248,13 +249,15 @@ Server-Sent Events streaming chat with automatic session management.
 }
 ```
 
-**Server sends events:**
-- `token`: Streamed text output
-- `tool`: Tool call or result
-- `thinking`: Reasoning output
-- `agent`: Agent delegation events
-- `error`: Error message
-- `finish`: Response complete (triggers session save)
+**Server sends events (same format as WebSocket):**
+- `token`: Streamed text output `{"type": "token", "agent_name": "...", "data": {"content": "..."}}`
+- `tool_call`: Tool invocation `{"type": "tool_call", "agent_name": "...", "data": {"tool_name": "...", "arguments": "..."}}`
+- `tool_result`: Tool execution result `{"type": "tool_result", "agent_name": "...", "data": {"result": "..."}}`
+- `agent_call`: Agent delegation start `{"type": "agent_call", "agent_name": "...", "data": {"agent_name": "...", "from": "...", "message": "..."}}`
+- `agent_return`: Agent delegation complete `{"type": "agent_return", "agent_name": "...", "data": {"result": "...", "caller": "..."}}`
+- `thinking`: Reasoning output `{"type": "thinking", "agent_name": "...", "data": {"content": "..."}}`
+- `error`: Error message `{"type": "error", "agent_name": "...", "data": {"message": "..."}}`
+- `finish`: Response complete (triggers session save) `{"type": "finish", "agent_name": "...", "data": {"message": "...", "output": "...", "session_id": "..."}}`
 
 **Session Behavior:**
 - New session created if session_id is empty/null

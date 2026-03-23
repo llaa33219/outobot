@@ -370,26 +370,30 @@ Streaming chat using Server-Sent Events (SSE).
 - `session_id` (string, optional): Session ID to continue conversation
 - `attachments` (array, optional): List of file attachments
 
-**SSE Event Types:**
+**SSE Event Types (same format as WebSocket):**
 
 ##### token
 
 Regular text output from the agent.
 
 ```json
-{"type": "token", "content": "Hello! "}
+{"type": "token", "agent_name": "outo", "data": {"content": "Hello! "}}
 ```
 
-##### tool
+##### tool_call
 
-Tool call or result notification.
+Tool invocation.
 
 ```json
-{"type": "tool", "content": "🔧 [outo] Calling tool: read_file\n   Args: {'path': '/home/user/file.txt'}"}
+{"type": "tool_call", "agent_name": "outo", "data": {"tool_name": "read_file", "arguments": "{'path': '/home/user/file.txt'}"}}
 ```
 
+##### tool_result
+
+Tool execution result.
+
 ```json
-{"type": "tool", "content": "✅ [outo] Tool result: file content..."}
+{"type": "tool_result", "agent_name": "outo", "data": {"result": "file content..."}}
 ```
 
 ##### thinking
@@ -397,19 +401,23 @@ Tool call or result notification.
 Agent reasoning display.
 
 ```json
-{"type": "thinking", "content": "💭 [outo] Thinking: Let me break this down..."}
+{"type": "thinking", "agent_name": "outo", "data": {"content": "Let me break this down..."}}
 ```
 
-##### agent
+##### agent_call
 
-Agent delegation events.
+Agent delegation start.
 
 ```json
-{"type": "agent", "content": "📤 [outo] → Delegating to: inquisitor\n   Message: Research the topic..."}
+{"type": "agent_call", "agent_name": "outo", "data": {"agent_name": "outo", "from": "inquisitor", "message": "Research the topic..."}}
 ```
 
+##### agent_return
+
+Agent delegation complete.
+
 ```json
-{"type": "agent", "content": "📥 [inquisitor] ← Returned from: inquisitor\n   Result: Research findings..."}
+{"type": "agent_return", "agent_name": "inquisitor", "data": {"result": "Research findings...", "caller": "outo"}}
 ```
 
 ##### error
@@ -417,7 +425,7 @@ Agent delegation events.
 Error messages.
 
 ```json
-{"type": "error", "content": "❌ [outo] Error: API rate limit exceeded"}
+{"type": "error", "agent_name": "outo", "data": {"message": "API rate limit exceeded"}}
 ```
 
 ##### finish
@@ -427,8 +435,12 @@ Response completion.
 ```json
 {
   "type": "finish",
-  "output": "Final response text...",
-  "session_id": "session_20260315_143022"
+  "agent_name": "outo",
+  "data": {
+    "message": "Final response text...",
+    "output": "Final response text...",
+    "session_id": "session_20260315_143022"
+  }
 }
 ```
 
