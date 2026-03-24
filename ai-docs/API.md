@@ -377,56 +377,102 @@ Streaming chat using Server-Sent Events (SSE).
 Regular text output from the agent.
 
 ```json
-{"type": "token", "agent_name": "outo", "data": {"content": "Hello! "}}
+{"type": "token", "agent_name": "outo", "call_id": "call_abc123", "data": {"content": "Hello! "}}
 ```
+
+**Fields:**
+- `type`: Event type ("token")
+- `agent_name`: Name of the agent producing the token
+- `call_id`: Unique identifier for the agent call (used to route tokens to the correct agent card)
+- `data.content`: The text content
 
 ##### tool_call
 
 Tool invocation.
 
 ```json
-{"type": "tool_call", "agent_name": "outo", "data": {"tool_name": "read_file", "arguments": "{'path': '/home/user/file.txt'}"}}
+{"type": "tool_call", "agent_name": "outo", "call_id": "call_abc123", "data": {"tool_name": "read_file", "arguments": "{'path': '/home/user/file.txt'}"}}
 ```
+
+**Fields:**
+- `type`: Event type ("tool_call")
+- `agent_name`: Name of the agent calling the tool
+- `call_id`: Unique identifier linking this tool call to an agent delegation
+- `data.tool_name`: Name of the tool being called
+- `data.arguments`: Tool arguments as JSON string
 
 ##### tool_result
 
 Tool execution result.
 
 ```json
-{"type": "tool_result", "agent_name": "outo", "data": {"result": "file content..."}}
+{"type": "tool_result", "agent_name": "outo", "call_id": "call_abc123", "data": {"result": "file content..."}}
 ```
+
+**Fields:**
+- `type`: Event type ("tool_result")
+- `agent_name`: Name of the agent that called the tool
+- `call_id`: Unique identifier linking to the tool_call event
+- `data.result`: The tool execution result
 
 ##### thinking
 
 Agent reasoning display.
 
 ```json
-{"type": "thinking", "agent_name": "outo", "data": {"content": "Let me break this down..."}}
+{"type": "thinking", "agent_name": "outo", "call_id": "call_abc123", "data": {"content": "Let me break this down..."}}
 ```
+
+**Fields:**
+- `type`: Event type ("thinking")
+- `agent_name`: Name of the agent thinking
+- `call_id`: Unique identifier for the agent call
+- `data.content`: The thinking/reasoning content
 
 ##### agent_call
 
-Agent delegation start.
+Agent delegation start. Indicates one agent has delegated a task to another agent.
 
 ```json
-{"type": "agent_call", "agent_name": "outo", "data": {"agent_name": "outo", "from": "inquisitor", "message": "Research the topic..."}}
+{"type": "agent_call", "agent_name": "outo", "call_id": "call_abc123", "data": {"agent_name": "outo", "from": "inquisitor", "message": "Research the topic..."}}
 ```
+
+**Fields:**
+- `type`: Event type ("agent_call")
+- `agent_name`: The sub-agent being called (target)
+- `call_id`: Unique identifier for this delegation (used to track the sub-agent's tokens and results)
+- `data.agent_name`: Same as top-level agent_name (the target/sub-agent)
+- `data.from`: The caller agent that delegated the task
+- `data.message`: Optional message describing the delegation
 
 ##### agent_return
 
-Agent delegation complete.
+Agent delegation complete. Indicates a sub-agent has finished its task and returned results.
 
 ```json
-{"type": "agent_return", "agent_name": "inquisitor", "data": {"result": "Research findings...", "caller": "outo"}}
+{"type": "agent_return", "agent_name": "inquisitor", "call_id": "call_abc123", "data": {"result": "Research findings...", "caller": "outo"}}
 ```
+
+**Fields:**
+- `type`: Event type ("agent_return")
+- `agent_name`: The sub-agent that completed the task
+- `call_id`: Unique identifier matching the corresponding agent_call
+- `data.result`: The results returned by the sub-agent
+- `data.caller`: The agent that originally delegated (for nested delegations)
 
 ##### error
 
 Error messages.
 
 ```json
-{"type": "error", "agent_name": "outo", "data": {"message": "API rate limit exceeded"}}
+{"type": "error", "agent_name": "outo", "call_id": "call_abc123", "data": {"message": "API rate limit exceeded"}}
 ```
+
+**Fields:**
+- `type`: Event type ("error")
+- `agent_name`: Name of the agent that encountered the error
+- `call_id`: Unique identifier for the agent call
+- `data.message`: The error message
 
 ##### finish
 
@@ -436,12 +482,22 @@ Response completion.
 {
   "type": "finish",
   "agent_name": "outo",
+  "call_id": "call_abc123",
   "data": {
     "message": "Final response text...",
     "output": "Final response text...",
     "session_id": "session_20260315_143022"
   }
 }
+```
+
+**Fields:**
+- `type`: Event type ("finish")
+- `agent_name`: Name of the agent that completed
+- `call_id`: Unique identifier for the agent call
+- `data.message`: Final message content
+- `data.output`: Same as message (for compatibility)
+- `data.session_id`: Session identifier for conversation continuity
 ```
 
 **JavaScript Example:**
@@ -533,16 +589,23 @@ ws.onmessage = (event) => {
 
 **Event Types:**
 
+All WebSocket events have the same structure as SSE events described above, including the `call_id` field for correlating events with agent delegations.
+
 | Type | Description |
 |------|-------------|
-| `token` | Text output |
+| `token` | Text output (with `call_id` for routing to agent cards) |
 | `tool_call` | Tool being called |
 | `tool_result` | Tool result |
-| `agent_call` | Agent delegation |
-| `agent_return` | Agent returning |
+| `agent_call` | Agent delegation (includes `call_id`) |
+| `agent_return` | Agent returning (correlates via `call_id`) |
 | `thinking` | Agent reasoning |
 | `error` | Error message |
 | `finish` | Complete |
+
+**Example WebSocket token event:**
+```json
+{"type": "token", "agent_name": "outo", "call_id": "call_abc123", "data": {"content": "Hello! "}}
+```
 
 ---
 

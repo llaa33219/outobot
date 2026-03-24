@@ -125,6 +125,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     event_data = {
                         "type": "token",
                         "agent_name": event.agent_name,
+                        "call_id": event.call_id,
                         "data": {"content": event.data.get("text", "")},
                     }
                 elif event.type == "tool_call":
@@ -139,6 +140,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     event_data = {
                         "type": "tool_call",
                         "agent_name": event.agent_name,
+                        "call_id": event.call_id,
                         "data": {
                             "tool_name": tool_name,
                             "arguments": tool_args,
@@ -149,6 +151,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                         {
                             "type": "tool_call",
                             "agent_name": event.agent_name,
+                            "call_id": event.call_id,
                             "data": {"tool_name": tool_name, "arguments": tool_args},
                         }
                     )
@@ -161,6 +164,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     event_data = {
                         "type": "tool_result",
                         "agent_name": event.agent_name,
+                        "call_id": event.call_id,
                         "data": {"result": result},
                     }
                     # Collect raw event for replay
@@ -168,6 +172,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                         {
                             "type": "tool_result",
                             "agent_name": event.agent_name,
+                            "call_id": event.call_id,
                             "data": {
                                 "result": result,
                                 "tool_name": tool_name,
@@ -182,6 +187,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     event_data = {
                         "type": "agent_call",
                         "agent_name": event.agent_name,
+                        "call_id": event.call_id,
                         "data": {
                             "agent_name": event.agent_name,
                             "from": target,
@@ -193,6 +199,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                         {
                             "type": "agent_call",
                             "agent_name": event.agent_name,
+                            "call_id": event.call_id,
                             "data": {
                                 "agent_name": event.agent_name,
                                 "from": target,
@@ -208,6 +215,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     event_data = {
                         "type": "agent_return",
                         "agent_name": event.agent_name,
+                        "call_id": event.call_id,
                         "data": {"result": result},
                     }
                     # Collect raw event for replay
@@ -215,6 +223,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                         {
                             "type": "agent_return",
                             "agent_name": event.agent_name,
+                            "call_id": event.call_id,
                             "data": {"result": result, "caller": caller},
                         }
                     )
@@ -233,6 +242,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     event_data = {
                         "type": "thinking",
                         "agent_name": event.agent_name,
+                        "call_id": event.call_id,
                         "data": {"content": thinking},
                     }
                     # Collect raw event for replay
@@ -240,6 +250,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                         {
                             "type": "thinking",
                             "agent_name": event.agent_name,
+                            "call_id": event.call_id,
                             "data": {"content": thinking},
                         }
                     )
@@ -248,6 +259,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     event_data = {
                         "type": "error",
                         "agent_name": event.agent_name,
+                        "call_id": event.call_id,
                         "data": {"message": error},
                     }
                     # Collect raw event for replay
@@ -255,6 +267,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                         {
                             "type": "error",
                             "agent_name": event.agent_name,
+                            "call_id": event.call_id,
                             "data": {"message": error},
                         }
                     )
@@ -263,6 +276,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     event_data = {
                         "type": "finish",
                         "agent_name": event.agent_name,
+                        "call_id": event.call_id,
                         "data": {
                             "message": output,
                             "output": output,
@@ -274,6 +288,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                         {
                             "type": "finish",
                             "agent_name": request.agent,
+                            "call_id": event.call_id,
                             "data": {"output": output, "session_id": session_id},
                         }
                     )
@@ -393,6 +408,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     {
                         "type": "finish",
                         "agent_name": request.agent,
+                        "call_id": event.call_id,
                         "data": {"output": output, "session_id": session_id},
                     }
                 )
@@ -418,6 +434,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     {
                         "type": "tool_call",
                         "agent_name": event.agent_name,
+                        "call_id": event.call_id,
                         "data": {"tool_name": tool_name, "arguments": tool_args},
                     }
                 )
@@ -426,6 +443,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     {
                         "type": "tool_result",
                         "agent_name": event.agent_name,
+                        "call_id": event.call_id,
                         "data": {
                             "result": event.data.get("result", ""),
                             "tool_name": event.data.get("tool_name", "tool"),
@@ -437,6 +455,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     {
                         "type": "agent_call",
                         "agent_name": event.agent_name,
+                        "call_id": event.call_id,
                         "data": {
                             "agent_name": event.agent_name,
                             "from": event.data.get("target", ""),
@@ -449,6 +468,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     {
                         "type": "agent_return",
                         "agent_name": event.agent_name,
+                        "call_id": event.call_id,
                         "data": {
                             "result": event.data.get("result", ""),
                             "caller": pending_delegations.get(
@@ -474,6 +494,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     {
                         "type": "thinking",
                         "agent_name": event.agent_name,
+                        "call_id": event.call_id,
                         "data": {"content": event.data.get("thinking", "")},
                     }
                 )
@@ -482,6 +503,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     {
                         "type": "error",
                         "agent_name": event.agent_name,
+                        "call_id": event.call_id,
                         "data": {"message": event.data.get("error", "Unknown error")},
                     }
                 )
@@ -661,6 +683,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                             event_data = {
                                 "type": "token",
                                 "agent_name": event.agent_name,
+                                "call_id": event.call_id,
                                 "data": {"content": event.data.get("text", "")},
                             }
                         elif event.type == "tool_call":
@@ -675,6 +698,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                             event_data = {
                                 "type": "tool_call",
                                 "agent_name": event.agent_name,
+                                "call_id": event.call_id,
                                 "data": {
                                     "tool_name": tool_name,
                                     "arguments": tool_args,
@@ -692,6 +716,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                             event_data = {
                                 "type": "tool_result",
                                 "agent_name": event.agent_name,
+                                "call_id": event.call_id,
                                 "data": {"result": result},
                             }
                             events.append(event_data)
@@ -703,6 +728,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                             event_data = {
                                 "type": "agent_call",
                                 "agent_name": event.agent_name,
+                                "call_id": event.call_id,
                                 "data": {
                                     "agent_name": event.agent_name,
                                     "from": event.data.get("from", ""),
@@ -724,6 +750,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                             event_data = {
                                 "type": "agent_return",
                                 "agent_name": event.agent_name,
+                                "call_id": event.call_id,
                                 "data": {"result": result},
                             }
                             events.append(event_data)
@@ -741,6 +768,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                             event_data = {
                                 "type": "thinking",
                                 "agent_name": event.agent_name,
+                                "call_id": event.call_id,
                                 "data": {"content": event.data.get("thinking", "")},
                             }
                             events.append(event_data)
@@ -749,6 +777,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                             event_data = {
                                 "type": "error",
                                 "agent_name": event.agent_name,
+                                "call_id": event.call_id,
                                 "data": {"message": error_msg},
                             }
                             events.append(event_data)
@@ -757,6 +786,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                             event_data = {
                                 "type": "finish",
                                 "agent_name": event.agent_name,
+                                "call_id": event.call_id,
                                 "data": {
                                     "message": output,
                                     "output": output,

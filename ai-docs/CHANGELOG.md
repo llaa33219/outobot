@@ -1,5 +1,53 @@
 # OutObot Changelog
 
+## 2026-03-24 - Agent Call ID Tracking
+
+### Problem
+When handling nested agent delegations (e.g., OutObot → Inquisitor → Rimor), tokens and events from sub-agents were difficult to route correctly because they were keyed only by agent name, causing collisions when multiple agents of the same name were active.
+
+### Solution
+Added `call_id` field to all server-sent events for unique identification of agent delegation instances:
+
+**Backend (`outo/server/routes/chat.py`):**
+- Added `"call_id": event.call_id` to all event types:
+  - `token`
+  - `tool_call`
+  - `tool_result`
+  - `agent_call`
+  - `agent_return`
+  - `thinking`
+  - `error`
+  - `finish`
+
+**Frontend (`static/script.js`):**
+- Changed agent card tracking from `agent_name` to `call_id` as the key
+- Added `pendingTokens` object to buffer tokens for agents that haven't created their card yet
+- Added `pendingAgentCalls` Set to track agents that have been called but card not yet created
+- Added `_flushPendingTokens()` method to flush buffered tokens when agent card is created
+- Updated `createToolCard` to accept `cardKey` parameter for proper card placement
+- Updated all event handlers to use `call_id` for routing
+
+### Event Flow with call_id
+```
+1. Backend: agent_call {agent_name: "inquisitor", call_id: "call_xyz789", data: {from: "outo"}}
+2. Frontend: Creates agent card keyed by call_id "call_xyz789"
+3. Backend: token {agent_name: "inquisitor", call_id: "call_xyz789", data: {content: "..."}}
+4. Frontend: Routes token to card via call_id "call_xyz789" ✓
+5. Backend: agent_return {agent_name: "inquisitor", call_id: "call_xyz789", data: {result: "..."}}
+6. Frontend: Finalizes card via call_id "call_xyz789" ✓
+```
+
+### Benefits
+1. **Nested delegation support**: Multiple levels of agent delegation now work correctly
+2. **Concurrent sub-agents**: Same agent name can run multiple times with different call_ids
+3. **Buffered token handling**: Tokens arriving before agent card is created are buffered and flushed properly
+4. **Proper cleanup**: `pendingTokens` and `pendingAgentCalls` are cleared on session reset
+
+### API Impact
+All SSE and WebSocket events now include `call_id` field. Clients should use `call_id` instead of `agent_name` for correlating events with specific delegation instances.
+
+---
+
 ## 2026-03-22 - install.sh Fresh Sync on Update
 
 ### Problem

@@ -77,6 +77,8 @@ class OutObotChat {
     this.callStack = [];
     this.agentStartTimes = {};
     this.agentMeta = AGENT_DEFAULTS;
+    this.pendingTokens = {};  // Buffered tokens for agents without cards yet
+    this.pendingAgentCalls = new Set();  // Agents that have been called but card not yet created
 
     if (window.innerWidth <= 960) {
       this.els.sidebar.classList.add('collapsed');
@@ -241,20 +243,24 @@ class OutObotChat {
   }
 
   handleEvent(event) {
-    const { type, agent_name, data } = event;
+    const { type, agent_name, data, call_id } = event;
     const agent = agent_name || 'outo';
+    const cid = call_id || agent;
 
     switch (type) {
       case 'token':
-        this.ensureAgentBubble(agent);
-        this.agentTokens[agent] = (this.agentTokens[agent] || '') + (data.content || '');
-        if (this.subAgentCards[agent]) {
-          const card = this.subAgentCards[agent];
+        this.agentTokens[cid] = (this.agentTokens[cid] || '') + (data.content || '');
+        if (this.subAgentCards[cid]) {
+          this.ensureAgentBubble(agent);
+          const card = this.subAgentCards[cid];
           this._ensureCardTextSegment(card);
           card.currentSegmentText += data.content || '';
           card.currentTextSegment.textContent = card.currentSegmentText;
           card.contentStreamEl.scrollTop = card.contentStreamEl.scrollHeight;
+        } else if (this.pendingAgentCalls.has(cid)) {
+          this.pendingTokens[cid] = (this.pendingTokens[cid] || '') + (data.content || '');
         } else {
+          this.ensureAgentBubble(agent);
           this.ensureTextSegment();
           this.currentSegmentText += data.content || '';
           this.currentTextSegment.textContent = this.currentSegmentText;
@@ -266,9 +272,10 @@ class OutObotChat {
       case 'agent_call': {
         const caller = data.from || agent;
         const target = data.agent_name || agent;
+        const callerId = call_id || caller;
         this.ensureAgentBubble(caller);
-        if (this.subAgentCards[caller]) {
-          this._finalizeCardTextSegment(this.subAgentCards[caller]);
+        if (this.subAgentCards[callerId]) {
+          this._finalizeCardTextSegment(this.subAgentCards[callerId]);
         } else {
           this.finalizeCurrentTextSegment();
         }
@@ -277,52 +284,60 @@ class OutObotChat {
         this.setAgentActive(caller, true);
         this.setAgentActive(target, true);
         this.addActivityChip('agent-call', this.getAgentIcon(caller) + ' → ' + this.getAgentIcon(target) + ' ' + this.getAgentLabel(target));
-        this.agentTokens[target] = '';
-        this.agentStartTimes[target] = Date.now();
-        if (this.subAgentCards[caller]) {
-          this.subAgentCards[caller].cardEl.classList.add('delegating');
-          this.subAgentCards[caller].cardEl.classList.remove('active-focus');
+        this.agentTokens[call_id] = '';
+        this.agentStartTimes[call_id] = Date.now();
+        this.pendingAgentCalls.add(call_id);
+        if (this.subAgentCards[callerId]) {
+          this.subAgentCards[callerId].cardEl.classList.add('delegating');
+          this.subAgentCards[callerId].cardEl.classList.remove('active-focus');
         }
         const card = this.createAgentCard(caller, target, data.message || '');
         card.callerName = caller;
+        card.callId = call_id;
         card.cardEl.classList.add('active-focus');
-        this.subAgentCards[target] = card;
+        this.subAgentCards[call_id] = card;
+        this._flushPendingTokens(call_id);
+        this.pendingAgentCalls.delete(call_id);
         if (this.callStack.length === 0) {
-          this.callStack.push(caller);
+          this.callStack.push(callerId);
         }
-        this.callStack.push(target);
+        this.callStack.push(call_id);
         this.addLogEntry(this.getAgentIcon(caller), '<strong>' + this.getAgentLabel(caller) + '</strong> → <strong>' + this.getAgentLabel(target) + '</strong> called', null, data.message ? this.truncateText(data.message, 120) : null);
         this.scrollToBottom();
         break;
       }
 
       case 'agent_return': {
+        const cid = call_id || agent;
         this.setAgentActive(agent, false);
-        if (this.subAgentCards[agent]) {
-          const card = this.subAgentCards[agent];
-          const tokens = this.agentTokens[agent] || '';
+        delete this.pendingTokens[cid];
+        this.pendingAgentCalls.delete(cid);
+        if (this.subAgentCards[cid]) {
+          const card = this.subAgentCards[cid];
+          const tokens = this.agentTokens[cid] || '';
           if (!card.finishRendered) {
             this._finalizeAgentCard(card, tokens, data.result);
           } else if (data.result && data.result.trim() && !card.resultSection.classList.contains('visible')) {
             card.resultEl.innerHTML = this.renderMarkdown(data.result);
             card.resultSection.classList.add('visible');
           }
-          const elapsed = ((Date.now() - (this.agentStartTimes[agent] || Date.now())) / 1000).toFixed(1);
+          const elapsed = ((Date.now() - (this.agentStartTimes[cid] || Date.now())) / 1000).toFixed(1);
           card.statusEl.textContent = 'Done';
           card.statusEl.className = 'ic-status done';
           if (card.elapsedEl) card.elapsedEl.textContent = elapsed + 's';
           card.cardEl.classList.add('completed');
           card.cardEl.classList.remove('active-focus');
           const callerName = card.callerName;
-          if (callerName && this.subAgentCards[callerName]) {
-            this.subAgentCards[callerName].cardEl.classList.remove('delegating');
-            this.subAgentCards[callerName].cardEl.classList.add('active-focus');
+          const callerId = card.callId || callerName;
+          if (callerId && this.subAgentCards[callerId]) {
+            this.subAgentCards[callerId].cardEl.classList.remove('delegating');
+            this.subAgentCards[callerId].cardEl.classList.add('active-focus');
           }
           setTimeout(() => { card.cardEl.classList.add('collapsed'); }, 1000);
-          delete this.subAgentCards[agent];
+          delete this.subAgentCards[cid];
         }
-        delete this.agentStartTimes[agent];
-        const retIdx = this.callStack.lastIndexOf(agent);
+        delete this.agentStartTimes[cid];
+        const retIdx = this.callStack.lastIndexOf(cid);
         if (retIdx >= 0) this.callStack.splice(retIdx, 1);
         this.addLogEntry(this.getAgentIcon(agent), '<strong>' + this.getAgentLabel(agent) + '</strong> done', null, data.result ? this.truncateText(data.result, 120) : null);
         break;
@@ -330,14 +345,14 @@ class OutObotChat {
 
       case 'tool_call':
         this.ensureAgentBubble(agent);
-        if (this.subAgentCards[agent]) {
-          this._finalizeCardTextSegment(this.subAgentCards[agent]);
+        if (this.subAgentCards[cid]) {
+          this._finalizeCardTextSegment(this.subAgentCards[cid]);
         } else {
           this.finalizeCurrentTextSegment();
         }
         this.involvedAgents.add(agent);
         this.addActivityChip('tool-call', '⚡ ' + (data.tool_name || 'tool'));
-        this.createToolCard(agent, data.tool_name || 'tool', data.arguments || {});
+        this.createToolCard(agent, cid, data.tool_name || 'tool', data.arguments || {});
         this.addLogEntry('⚡', '<strong>' + this.getAgentLabel(agent) + '</strong> → ' + (data.tool_name || 'tool') + '()', null, data.arguments ? JSON.stringify(data.arguments) : null);
         this.scrollToBottom();
         break;
@@ -347,12 +362,12 @@ class OutObotChat {
         break;
 
       case 'finish':
-        if (this.subAgentCards[agent]) {
-          const card = this.subAgentCards[agent];
-          const tokens = this.agentTokens[agent] || '';
+        if (this.subAgentCards[cid]) {
+          const card = this.subAgentCards[cid];
+          const tokens = this.agentTokens[cid] || '';
           this._finalizeAgentCard(card, tokens, data.message);
           card.finishRendered = true;
-          const subElapsed = ((Date.now() - (this.agentStartTimes[agent] || Date.now())) / 1000).toFixed(1);
+          const subElapsed = ((Date.now() - (this.agentStartTimes[cid] || Date.now())) / 1000).toFixed(1);
           if (card.elapsedEl) card.elapsedEl.textContent = subElapsed + 's';
           this.setAgentActive(agent, false);
           this.scrollToBottom();
@@ -368,10 +383,10 @@ class OutObotChat {
         } else {
           this.finalizeCurrentTextSegment();
         }
-        Object.keys(this.subAgentCards).forEach((name) => {
-          const c = this.subAgentCards[name];
+        Object.keys(this.subAgentCards).forEach((key) => {
+          const c = this.subAgentCards[key];
           if (!c.finishRendered) {
-            this._finalizeAgentCard(c, this.agentTokens[name] || '', null);
+            this._finalizeAgentCard(c, this.agentTokens[key] || '', null);
           }
           c.statusEl.textContent = 'Done';
           c.statusEl.className = 'ic-status done';
@@ -379,6 +394,8 @@ class OutObotChat {
         });
         this.subAgentCards = {};
         this.callStack = [];
+        this.pendingTokens = {};
+        this.pendingAgentCalls.clear();
         if (this.currentTextSegment && !this.currentTextSegment.textContent.trim() && !this.currentTextSegment.innerHTML.trim()) {
           this.currentTextSegment.remove();
           this.currentTextSegment = null;
@@ -415,10 +432,10 @@ class OutObotChat {
 
       case 'error':
         this.finalizeCurrentTextSegment();
-        Object.keys(this.subAgentCards).forEach((name) => {
-          const c = this.subAgentCards[name];
+        Object.keys(this.subAgentCards).forEach((key) => {
+          const c = this.subAgentCards[key];
           if (!c.finishRendered) {
-            this._finalizeAgentCard(c, this.agentTokens[name] || '', null);
+            this._finalizeAgentCard(c, this.agentTokens[key] || '', null);
           }
           c.statusEl.textContent = 'Error';
           c.statusEl.className = 'ic-status done';
@@ -426,6 +443,8 @@ class OutObotChat {
         });
         this.subAgentCards = {};
         this.callStack = [];
+        this.pendingTokens = {};
+        this.pendingAgentCalls.clear();
         this.showError(data.message || 'An unknown error occurred.');
         this.deactivateAllAgents();
         this.setProcessing(false);
@@ -721,6 +740,8 @@ class OutObotChat {
     this.agentTokens = {};
     this.subAgentCards = {};
     this.callStack = [];
+    this.pendingTokens = {};
+    this.pendingAgentCalls.clear();
     this.agentStartTimes = {};
     this.activeAgents.clear();
     this.involvedAgents.clear();
@@ -741,6 +762,8 @@ class OutObotChat {
     this.agentTokens = {};
     this.subAgentCards = {};
     this.callStack = [];
+    this.pendingTokens = {};
+    this.pendingAgentCalls.clear();
     this.agentStartTimes = {};
     
     this.els.chatArea.querySelectorAll('.message, .agent-card, .tool-card, .interaction-card').forEach(el => el.remove());
@@ -802,6 +825,8 @@ class OutObotChat {
     this.subAgentCards = {};
     this.callStack = [];
     this.agentTokens = {};
+    this.pendingTokens = {};
+    this.pendingAgentCalls.clear();
     this.agentStartTimes = {};
     
     const existingContainer = this.els.chatArea.querySelector('.message-container');
@@ -895,6 +920,8 @@ class OutObotChat {
     this.agentTokens = {};
     this.subAgentCards = {};
     this.callStack = [];
+    this.pendingTokens = {};
+    this.pendingAgentCalls.clear();
     this.agentStartTimes = {};
     this.clearActivityLog();
     this.addLogEntry('💬', '<strong>User</strong> message sent');
@@ -1121,7 +1148,19 @@ class OutObotChat {
     }
   }
 
-  createToolCard(agentName, toolName, args) {
+  _flushPendingTokens(agent) {
+    const pending = this.pendingTokens[agent];
+    if (!pending) return;
+    const card = this.subAgentCards[agent];
+    if (!card) return;
+    this._ensureCardTextSegment(card);
+    card.currentSegmentText += pending;
+    card.currentTextSegment.textContent = card.currentSegmentText;
+    card.contentStreamEl.scrollTop = card.contentStreamEl.scrollHeight;
+    delete this.pendingTokens[agent];
+  }
+
+  createToolCard(agentName, cardKey, toolName, args) {
     const meta = this.agentMeta[agentName] || { icon: '🔆', label: agentName, color: '#6366f1' };
 
     const card = document.createElement('div');
@@ -1154,8 +1193,8 @@ class OutObotChat {
     card.appendChild(header);
     card.appendChild(body);
 
-    if (this.subAgentCards[agentName]) {
-      this.subAgentCards[agentName].contentStreamEl.appendChild(card);
+    if (this.subAgentCards[cardKey]) {
+      this.subAgentCards[cardKey].contentStreamEl.appendChild(card);
     } else if (this.contentStreamEl) {
       this.contentStreamEl.appendChild(card);
     }
