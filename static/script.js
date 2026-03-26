@@ -1,3 +1,8 @@
+/**
+ * OutObot Chat - Main Entry Point
+ * Wires together UI, Events, Replay, and Session modules
+ */
+
 const PROVIDER_KEYS = [
   { name: 'openai', inputId: 'openaiKeyInput', statusId: 'openaiStatus', key: 'openai' },
   { name: 'anthropic', inputId: 'anthropicKeyInput', statusId: 'anthropicStatus', key: 'anthropic' },
@@ -58,6 +63,7 @@ class OutObotChat {
     this.sessions = [];
     this.processing = false;
     this.userScrolledUp = false;
+    this.messageContainer = null;
     
     this.ws = null;
     this.reconnectDelay = 1000;
@@ -77,8 +83,8 @@ class OutObotChat {
     this.callStack = [];
     this.agentStartTimes = {};
     this.agentMeta = AGENT_DEFAULTS;
-    this.pendingTokens = {};  // Buffered tokens for agents without cards yet
-    this.pendingAgentCalls = new Set();  // Agents that have been called but card not yet created
+    this.pendingTokens = {};
+    this.pendingAgentCalls = new Set();
 
     if (window.innerWidth <= 960) {
       this.els.sidebar.classList.add('collapsed');
@@ -88,8 +94,16 @@ class OutObotChat {
       marked.use({ breaks: true, gfm: true });
     }
 
+    this.initModules();
     this.bindEvents();
     this.init();
+  }
+
+  initModules() {
+    this.ui = new UIRenderer(this);
+    this.eventHandlers = new EventHandlers(this, this.ui);
+    this.sessionManager = new SessionManager(this);
+    this.sessionReplay = new SessionReplay(this, this.ui, this.eventHandlers);
   }
 
   bindEvents() {
@@ -178,6 +192,16 @@ class OutObotChat {
     this.els.defaultModelSelect?.addEventListener('change', () => {
     });
 
+    PROVIDER_KEYS.forEach(({ inputId }) => {
+      const input = document.getElementById(inputId);
+      if (input) {
+        input.addEventListener('input', () => {
+          this.populateDefaultProviderSelect();
+          this.updateDefaultModels();
+        });
+      }
+    });
+
     document.getElementById('newSessionBtn')?.addEventListener('click', () => this.createNewSession());
   }
 
@@ -188,14 +212,15 @@ class OutObotChat {
       await Promise.all([
         this.loadProviders(),
         this.loadAgents(),
-        this.loadSessions(),
+        this.sessionManager.loadSessions(),
         this.loadSkills()
       ]);
       
       this.buildAgentBar();
       this.buildSidebarAgents();
-      this.renderSessionList();
+      this.sessionManager.renderSessionList();
       this.checkWelcomeSetup();
+      this.updateProviderStatuses();
       this.connectWebSocket();
     } catch (error) {
       console.error('Init error:', error);
@@ -235,230 +260,15 @@ class OutObotChat {
     this.ws.onmessage = (e) => {
       try {
         const event = JSON.parse(e.data);
-        this.handleEvent(event);
+        this.eventHandlers.handleEvent(event);
       } catch (err) {
         console.error('Failed to parse event:', err);
       }
     };
   }
 
-  handleEvent(event) {
-    const { type, agent_name, data, call_id } = event;
-    const agent = agent_name || 'outo';
-    const cid = call_id || agent;
-
-    switch (type) {
-      case 'token':
-        this.agentTokens[cid] = (this.agentTokens[cid] || '') + (data.content || '');
-        if (this.subAgentCards[cid]) {
-          this.ensureAgentBubble(agent);
-          const card = this.subAgentCards[cid];
-          this._ensureCardTextSegment(card);
-          card.currentSegmentText += data.content || '';
-          card.currentTextSegment.textContent = card.currentSegmentText;
-          card.contentStreamEl.scrollTop = card.contentStreamEl.scrollHeight;
-        } else if (this.pendingAgentCalls.has(cid)) {
-          this.pendingTokens[cid] = (this.pendingTokens[cid] || '') + (data.content || '');
-        } else {
-          this.ensureAgentBubble(agent);
-          this.ensureTextSegment();
-          this.currentSegmentText += data.content || '';
-          this.currentTextSegment.textContent = this.currentSegmentText;
-          this.hasStreamedTopLevel = true;
-        }
-        this.scrollToBottom();
-        break;
-
-      case 'agent_call': {
-        const caller = data.from || agent;
-        const target = data.agent_name || agent;
-        const callerId = call_id || caller;
-        this.ensureAgentBubble(caller);
-        if (this.subAgentCards[callerId]) {
-          this._finalizeCardTextSegment(this.subAgentCards[callerId]);
-        } else {
-          this.finalizeCurrentTextSegment();
-        }
-        this.involvedAgents.add(caller);
-        this.involvedAgents.add(target);
-        this.setAgentActive(caller, true);
-        this.setAgentActive(target, true);
-        this.addActivityChip('agent-call', this.getAgentIcon(caller) + ' → ' + this.getAgentIcon(target) + ' ' + this.getAgentLabel(target));
-        this.agentTokens[call_id] = '';
-        this.agentStartTimes[call_id] = Date.now();
-        this.pendingAgentCalls.add(call_id);
-        if (this.subAgentCards[callerId]) {
-          this.subAgentCards[callerId].cardEl.classList.add('delegating');
-          this.subAgentCards[callerId].cardEl.classList.remove('active-focus');
-        }
-        const card = this.createAgentCard(caller, target, data.message || '');
-        card.callerName = caller;
-        card.callId = call_id;
-        card.cardEl.classList.add('active-focus');
-        this.subAgentCards[call_id] = card;
-        this._flushPendingTokens(call_id);
-        this.pendingAgentCalls.delete(call_id);
-        if (this.callStack.length === 0) {
-          this.callStack.push(callerId);
-        }
-        this.callStack.push(call_id);
-        this.addLogEntry(this.getAgentIcon(caller), '<strong>' + this.getAgentLabel(caller) + '</strong> → <strong>' + this.getAgentLabel(target) + '</strong> called', null, data.message ? this.truncateText(data.message, 120) : null);
-        this.scrollToBottom();
-        break;
-      }
-
-      case 'agent_return': {
-        const cid = call_id || agent;
-        this.setAgentActive(agent, false);
-        delete this.pendingTokens[cid];
-        this.pendingAgentCalls.delete(cid);
-        if (this.subAgentCards[cid]) {
-          const card = this.subAgentCards[cid];
-          const tokens = this.agentTokens[cid] || '';
-          if (!card.finishRendered) {
-            this._finalizeAgentCard(card, tokens, data.result);
-          } else if (data.result && data.result.trim() && !card.resultSection.classList.contains('visible')) {
-            card.resultEl.innerHTML = this.renderMarkdown(data.result);
-            card.resultSection.classList.add('visible');
-          }
-          const elapsed = ((Date.now() - (this.agentStartTimes[cid] || Date.now())) / 1000).toFixed(1);
-          card.statusEl.textContent = 'Done';
-          card.statusEl.className = 'ic-status done';
-          if (card.elapsedEl) card.elapsedEl.textContent = elapsed + 's';
-          card.cardEl.classList.add('completed');
-          card.cardEl.classList.remove('active-focus');
-          const callerName = card.callerName;
-          const callerId = card.callId || callerName;
-          if (callerId && this.subAgentCards[callerId]) {
-            this.subAgentCards[callerId].cardEl.classList.remove('delegating');
-            this.subAgentCards[callerId].cardEl.classList.add('active-focus');
-          }
-          setTimeout(() => { card.cardEl.classList.add('collapsed'); }, 1000);
-          delete this.subAgentCards[cid];
-        }
-        delete this.agentStartTimes[cid];
-        const retIdx = this.callStack.lastIndexOf(cid);
-        if (retIdx >= 0) this.callStack.splice(retIdx, 1);
-        this.addLogEntry(this.getAgentIcon(agent), '<strong>' + this.getAgentLabel(agent) + '</strong> done', null, data.result ? this.truncateText(data.result, 120) : null);
-        break;
-      }
-
-      case 'tool_call':
-        this.ensureAgentBubble(agent);
-        if (this.subAgentCards[cid]) {
-          this._finalizeCardTextSegment(this.subAgentCards[cid]);
-        } else {
-          this.finalizeCurrentTextSegment();
-        }
-        this.involvedAgents.add(agent);
-        this.addActivityChip('tool-call', '⚡ ' + (data.tool_name || 'tool'));
-        this.createToolCard(agent, cid, data.tool_name || 'tool', data.arguments || {});
-        this.addLogEntry('⚡', '<strong>' + this.getAgentLabel(agent) + '</strong> → ' + (data.tool_name || 'tool') + '()', null, data.arguments ? JSON.stringify(data.arguments) : null);
-        this.scrollToBottom();
-        break;
-
-      case 'tool_result':
-        this.addLogEntry('✅', '<strong>' + this.getAgentLabel(agent) + '</strong> tool result', null, data.result ? this.truncateText(data.result, 120) : null);
-        break;
-
-      case 'finish':
-        if (this.subAgentCards[cid]) {
-          const card = this.subAgentCards[cid];
-          const tokens = this.agentTokens[cid] || '';
-          this._finalizeAgentCard(card, tokens, data.message);
-          card.finishRendered = true;
-          const subElapsed = ((Date.now() - (this.agentStartTimes[cid] || Date.now())) / 1000).toFixed(1);
-          if (card.elapsedEl) card.elapsedEl.textContent = subElapsed + 's';
-          this.setAgentActive(agent, false);
-          this.scrollToBottom();
-          break;
-        }
-        this.ensureAgentBubble(agent);
-        const output = data.output || '';
-        if (!this.hasStreamedTopLevel && output) {
-          this.ensureTextSegment();
-          this.currentTextSegment.innerHTML = this.renderMarkdown(output);
-          this.currentTextSegment = null;
-          this.currentSegmentText = '';
-        } else {
-          this.finalizeCurrentTextSegment();
-        }
-        Object.keys(this.subAgentCards).forEach((key) => {
-          const c = this.subAgentCards[key];
-          if (!c.finishRendered) {
-            this._finalizeAgentCard(c, this.agentTokens[key] || '', null);
-          }
-          c.statusEl.textContent = 'Done';
-          c.statusEl.className = 'ic-status done';
-          c.cardEl.classList.add('completed', 'collapsed');
-        });
-        this.subAgentCards = {};
-        this.callStack = [];
-        this.pendingTokens = {};
-        this.pendingAgentCalls.clear();
-        if (this.currentTextSegment && !this.currentTextSegment.textContent.trim() && !this.currentTextSegment.innerHTML.trim()) {
-          this.currentTextSegment.remove();
-          this.currentTextSegment = null;
-        }
-        const mainTokens = this.agentTokens[agent] || '';
-        const mainReturn = data.output || '';
-        if (this.hasStreamedTopLevel && mainReturn.trim() && mainReturn.trim() !== mainTokens.trim()) {
-          const returnSection = document.createElement('div');
-          returnSection.className = 'ic-section ic-result-section visible main-return-section';
-          const returnLabel = document.createElement('div');
-          returnLabel.className = 'ic-section-label';
-          returnLabel.textContent = '✦ Response';
-          const returnEl = document.createElement('div');
-          returnEl.className = 'ic-content ic-result';
-          returnEl.innerHTML = this.renderMarkdown(mainReturn);
-          returnSection.appendChild(returnLabel);
-          returnSection.appendChild(returnEl);
-          this.contentStreamEl.appendChild(returnSection);
-        }
-        this.addMessageTrail();
-        this.deactivateAllAgents();
-        this.setProcessing(false);
-        this.addLogEntry('✅', 'Response complete', 'log-finish');
-        if (data.session_id) {
-          this._lastSessionId = data.session_id;
-          this.currentSession = data.session_id;
-          if (!this.sessions.includes(data.session_id)) {
-            this.sessions.unshift(data.session_id);
-            this.renderSessionList();
-          }
-        }
-        this.scrollToBottom();
-        break;
-
-      case 'error':
-        this.finalizeCurrentTextSegment();
-        Object.keys(this.subAgentCards).forEach((key) => {
-          const c = this.subAgentCards[key];
-          if (!c.finishRendered) {
-            this._finalizeAgentCard(c, this.agentTokens[key] || '', null);
-          }
-          c.statusEl.textContent = 'Error';
-          c.statusEl.className = 'ic-status done';
-          c.cardEl.classList.add('completed', 'collapsed');
-        });
-        this.subAgentCards = {};
-        this.callStack = [];
-        this.pendingTokens = {};
-        this.pendingAgentCalls.clear();
-        this.showError(data.message || 'An unknown error occurred.');
-        this.deactivateAllAgents();
-        this.setProcessing(false);
-        this.addLogEntry('❌', data.message || 'Error', 'log-error');
-        this.scrollToBottom();
-        break;
-
-      case 'thinking':
-        this.addLogEntry('💭', '<strong>' + this.getAgentLabel(agent) + '</strong> thinking', null, data.content ? this.truncateText(data.content, 120) : null);
-        break;
-
-      default:
-        break;
-    }
+  loadSessionData(sessionId) {
+    this.sessionReplay.loadSessionData(sessionId);
   }
 
   async loadProviders() {
@@ -486,16 +296,6 @@ class OutObotChat {
     }
   }
 
-  async loadSessions() {
-    try {
-      const res = await fetch('/api/sessions');
-      const data = await res.json();
-      this.sessions = data.sessions || [];
-    } catch (err) {
-      console.error('Failed to load sessions:', err);
-    }
-  }
-
   async loadSkills() {
     try {
       const res = await fetch('/api/skills');
@@ -506,15 +306,8 @@ class OutObotChat {
     }
   }
 
-  async loadSession(sessionId) {
-    try {
-      const res = await fetch(`/api/session/${sessionId}`);
-      const data = await res.json();
-      return data;
-    } catch (err) {
-      console.error('Failed to load session:', err);
-      return null;
-    }
+  loadSession(sessionId) {
+    return this.sessionManager.loadSession(sessionId);
   }
 
   buildAgentBar() {
@@ -555,7 +348,7 @@ class OutObotChat {
       const apiKey = input?.value?.trim() || '';
       const config = this.providerConfig[key] || {};
       
-      if (apiKey || config.enabled) {
+      if (apiKey || config.api_key) {
         availableProviders.push(key);
       }
     });
@@ -581,8 +374,10 @@ class OutObotChat {
       sel.appendChild(opt);
     });
     
-    const config = this.providerConfig[availableProviders[0]] || {};
-    if (config.enabled) {
+    const defaultProvider = this.providerConfig.default_provider;
+    if (defaultProvider && availableProviders.includes(defaultProvider)) {
+      sel.value = defaultProvider;
+    } else {
       sel.value = availableProviders[0];
     }
   }
@@ -600,6 +395,11 @@ class OutObotChat {
       opt.textContent = m;
       sel.appendChild(opt);
     });
+    
+    const config = this.providerConfig[providerName];
+    if (config && config.model) {
+      sel.value = config.model;
+    }
   }
 
   buildSidebarAgents() {
@@ -622,28 +422,17 @@ class OutObotChat {
   }
 
   renderSessionList() {
-    const list = this.els.sessionList;
-    list.innerHTML = '';
-    
-    if (this.sessions.length === 0) {
-      list.innerHTML = '<div class="session-empty">No sessions yet</div>';
-      return;
-    }
-    
-    this.sessions.forEach((sessionId) => {
-      const item = document.createElement('div');
-      item.className = 'session-item';
-      item.textContent = sessionId.length > 12 ? sessionId.substring(0, 12) + '...' : sessionId;
-      item.addEventListener('click', () => this.loadSessionData(sessionId));
-      list.appendChild(item);
-    });
+    this.sessionManager.renderSessionList();
   }
 
   checkWelcomeSetup() {
     if (!this.els.welcomeSetup) return;
     
-    const configured = Object.entries(this.providerConfig)
-      .filter(([key, val]) => val && val.enabled).length;
+    const providerKeys = ['openai', 'anthropic', 'google', 'minimax', 'glm', 'kimi'];
+    const configured = providerKeys.filter(key => {
+      const val = this.providerConfig[key];
+      return val && (val.api_key || val.enabled);
+    }).length;
     
     if (configured === 0) {
       this.els.welcomeSetup.innerHTML = '<button class="welcome-setup-btn" id="welcomeSetupBtn">Set up API keys</button>';
@@ -651,6 +440,21 @@ class OutObotChat {
     } else {
       this.els.welcomeSetup.innerHTML = '';
     }
+  }
+
+  updateProviderStatuses() {
+    PROVIDER_KEYS.forEach(({ name, statusId }) => {
+      const statusEl = document.getElementById(statusId);
+      if (!statusEl) return;
+      const config = this.providerConfig[name];
+      if (config && (config.api_key || config.enabled)) {
+        statusEl.textContent = '✓';
+        statusEl.className = 'key-status active';
+      } else {
+        statusEl.textContent = '';
+        statusEl.className = 'key-status';
+      }
+    });
   }
 
   selectAgent(agentKey) {
@@ -669,12 +473,14 @@ class OutObotChat {
 
   createNewSession() {
     this.currentSession = null;
+    this.messageContainer = null;
     
     const chatArea = this.els.chatArea;
     
     chatArea.querySelectorAll('.message').forEach(el => el.remove());
     chatArea.querySelectorAll('.agent-card').forEach(el => el.remove());
     chatArea.querySelectorAll('.tool-card').forEach(el => el.remove());
+    chatArea.querySelectorAll('.message-container').forEach(el => el.remove());
     
     let welcome = chatArea.querySelector('.welcome');
     if (!welcome) {
@@ -749,106 +555,6 @@ class OutObotChat {
     this.logActivity('Started new session');
   }
 
-  async loadSessionData(sessionId) {
-    this.currentSession = sessionId;
-    
-    this.currentBubble = null;
-    this.currentContentEl = null;
-    this.currentActivityEl = null;
-    this.contentStreamEl = null;
-    this.currentTextSegment = null;
-    this.currentSegmentText = '';
-    this.hasStreamedTopLevel = false;
-    this.agentTokens = {};
-    this.subAgentCards = {};
-    this.callStack = [];
-    this.pendingTokens = {};
-    this.pendingAgentCalls.clear();
-    this.agentStartTimes = {};
-    
-    this.els.chatArea.querySelectorAll('.message, .agent-card, .tool-card, .interaction-card').forEach(el => el.remove());
-    
-    const data = await this.loadSession(sessionId);
-    if (!data || !data.messages) {
-      this.logActivity('Failed to load session', 'error');
-      return;
-    }
-    
-    const welcome = this.els.chatArea.querySelector('.welcome');
-    if (welcome) welcome.classList.add('hidden');
-    
-    if (data.events && data.events.length > 0) {
-      const migratedEvents = data.events.map(event => {
-        if (event.type === 'finish') {
-          if (event.output !== undefined && event.data === undefined) {
-            return {
-              type: event.type,
-              agent_name: event.agent_name || 'outo',
-              data: {
-                message: event.output,
-                output: event.output,
-                session_id: event.session_id
-              }
-            };
-          }
-        }
-        return event;
-      });
-      this.replaySession(migratedEvents);
-    } else {
-      const existingContainer = this.els.chatArea.querySelector('.message-container');
-      if (existingContainer) existingContainer.remove();
-      
-      const container = document.createElement('div');
-      container.className = 'message-container';
-      this.els.chatArea.appendChild(container);
-      
-      data.messages.forEach(msg => {
-        const cat = msg.category;
-        if (cat === 'user' || (msg.sender === 'You')) {
-          this.renderUserMessage(msg.content, container);
-        } else if (cat === 'top-level') {
-          this.renderAgentMessage(msg.content, msg.sender, container);
-        } else if (cat === 'loop-internal') {
-          this.renderLoopInternalMessage(msg.caller || msg.sender, msg.sender, msg.content, container);
-        } else {
-          this.renderAgentMessage(msg.content, msg.sender, container);
-        }
-      });
-    }
-    
-    this.scrollToBottom();
-    this.logActivity(`Loaded session ${sessionId.substring(0, 8)}...`);
-  }
-
-  replaySession(events) {
-    this.subAgentCards = {};
-    this.callStack = [];
-    this.agentTokens = {};
-    this.pendingTokens = {};
-    this.pendingAgentCalls.clear();
-    this.agentStartTimes = {};
-    
-    const existingContainer = this.els.chatArea.querySelector('.message-container');
-    if (existingContainer) existingContainer.remove();
-    
-    const container = document.createElement('div');
-    container.className = 'message-container';
-    this.els.chatArea.appendChild(container);
-    
-    this.ensureAgentBubble('outo');
-    this.hasStreamedTopLevel = true;
-    
-    events.forEach((event, index) => {
-      setTimeout(() => {
-        this.handleEvent(event);
-        this.scrollToBottom();
-      }, index * 60);
-    });
-    
-    this.logActivity(`Replaying ${events.length} events...`);
-  }
-
   async sendMessage() {
     const text = this.els.messageInput.value.trim();
     if (!text || this.processing) return;
@@ -858,7 +564,7 @@ class OutObotChat {
     }
 
     this.hideWelcome();
-    this.addUserMessage(text);
+    this.ui.addUserMessage(text);
 
     let attachments = [];
     
@@ -946,257 +652,35 @@ class OutObotChat {
     }
   }
 
-  addUserMessage(text) {
-    const time = this.formatTime();
-    const msg = document.createElement('div');
-    msg.className = 'message user';
-    msg.innerHTML = `
-      <div class="message-avatar">👤</div>
-      <div class="message-body">
-        <div class="message-header">
-          <span class="message-name">You</span>
-          <span class="message-time">${time}</span>
-        </div>
-        <div class="message-content">${this.escapeHTML(text)}</div>
-      </div>
-    `;
-    this.els.chatArea.appendChild(msg);
-    this.scrollToBottom(true);
-  }
-
   ensureAgentBubble(agentName) {
-    if (this.currentBubble) return;
+    if (this.currentBubble) return this.currentBubble;
 
-    const meta = this.agentMeta[agentName] || { icon: '🔆', label: agentName, color: '#6366f1' };
-    const time = this.formatTime();
-
-    const msg = document.createElement('div');
-    msg.className = 'message agent';
-
-    const avatar = document.createElement('div');
-    avatar.className = 'message-avatar';
-    avatar.style.background = meta.color || '#6366f1';
-    avatar.textContent = meta.icon || '🔆';
-
-    const body = document.createElement('div');
-    body.className = 'message-body';
-
-    const header = document.createElement('div');
-    header.className = 'message-header';
-    header.innerHTML = '<span class="message-name" style="color:' + (meta.color || '#6366f1') + '">' + (meta.label || agentName) + '</span><span class="message-time">' + time + '</span>';
-
-    const activity = document.createElement('div');
-    activity.className = 'agent-activity';
-
-    const thinking = document.createElement('div');
-    thinking.className = 'thinking-indicator';
-    thinking.innerHTML = '<div class="thinking-dots"><span></span><span></span><span></span></div><span>Processing...</span>';
-
-    const contentStream = document.createElement('div');
-    contentStream.className = 'content-stream';
-
-    const textSegment = document.createElement('div');
-    textSegment.className = 'text-segment message-content';
-    contentStream.appendChild(textSegment);
-
-    body.appendChild(header);
-    body.appendChild(activity);
-    body.appendChild(contentStream);
-    body.appendChild(thinking);
-    msg.appendChild(avatar);
-    msg.appendChild(body);
-
-    this.els.chatArea.appendChild(msg);
-    this.currentBubble = msg;
-    this.contentStreamEl = contentStream;
-    this.currentTextSegment = textSegment;
+    const bubbleData = this.ui.createAgentBubbleElement(agentName);
+    this.els.chatArea.appendChild(bubbleData.element);
+    this.currentBubble = bubbleData.element;
+    this.contentStreamEl = bubbleData.contentStream;
+    this.currentTextSegment = bubbleData.textSegment;
     this.currentSegmentText = '';
-    this.currentContentEl = textSegment;
-    this.currentActivityEl = activity;
+    this.currentContentEl = bubbleData.textSegment;
+    this.currentActivityEl = bubbleData.activity;
     this.involvedAgents.add(agentName);
+    return this.currentBubble;
   }
 
-  finalizeCurrentTextSegment() {
-    if (!this.currentTextSegment) return;
-    if (this.currentSegmentText.trim()) {
-      this.currentTextSegment.innerHTML = this.renderMarkdown(this.currentSegmentText);
-    } else {
-      this.currentTextSegment.remove();
-    }
-    this.currentTextSegment = null;
-    this.currentSegmentText = '';
+  addMessageTrail() {
+    const bubble = this.currentBubble;
+    if (!bubble) return;
+    const thinking = bubble.querySelector('.thinking-indicator');
+    if (thinking) thinking.remove();
   }
 
-  ensureTextSegment() {
-    if (this.currentTextSegment) return;
-    if (!this.contentStreamEl) return;
-    const segment = document.createElement('div');
-    segment.className = 'text-segment message-content';
-    this.contentStreamEl.appendChild(segment);
-    this.currentTextSegment = segment;
-    this.currentContentEl = segment;
-    this.currentSegmentText = '';
-  }
-
-  createAgentCard(caller, target, message) {
-    const callerMeta = this.agentMeta[caller] || { icon: '🔆', label: caller, color: '#6366f1' };
-    const targetMeta = this.agentMeta[target] || { icon: '🔆', label: target, color: '#6366f1' };
-
-    let depth = 0;
-    if (this.subAgentCards[caller]) {
-      depth = (parseInt(this.subAgentCards[caller].cardEl.dataset.depth) || 0) + 1;
-    }
-
-    const card = document.createElement('div');
-    card.className = 'interaction-card agent-card';
-    card.style.setProperty('--card-color', targetMeta.color);
-    card.dataset.depth = depth;
-
-    const header = document.createElement('div');
-    header.className = 'ic-header';
-    header.innerHTML =
-      '<span class="ic-toggle">▼</span>' +
-      '<span class="ic-header-text">' +
-        '<span style="color:' + callerMeta.color + '">' + callerMeta.icon + ' ' + this.escapeHTML(callerMeta.label) + '</span>' +
-        ' <span class="ic-arrow">→</span> ' +
-        '<span style="color:' + targetMeta.color + '">' + targetMeta.icon + ' ' + this.escapeHTML(targetMeta.label) + '</span>' +
-      '</span>' +
-      '<span class="ic-status running">Processing</span>' +
-      '<span class="ic-elapsed"></span>';
-    header.addEventListener('click', () => card.classList.toggle('collapsed'));
-
-    const body = document.createElement('div');
-    body.className = 'ic-body';
-
-    const bodyInner = document.createElement('div');
-    bodyInner.className = 'ic-body-inner';
-
-    const contentStreamEl = document.createElement('div');
-    contentStreamEl.className = 'ic-content-stream';
-
-    const resultSection = document.createElement('div');
-    resultSection.className = 'ic-section ic-result-section';
-    const resultLabel = document.createElement('div');
-    resultLabel.className = 'ic-section-label';
-    resultLabel.textContent = '✦ Result';
-    const resultEl = document.createElement('div');
-    resultEl.className = 'ic-content ic-result';
-    resultSection.appendChild(resultLabel);
-    resultSection.appendChild(resultEl);
-
-    bodyInner.appendChild(contentStreamEl);
-    bodyInner.appendChild(resultSection);
-    body.appendChild(bodyInner);
-
-    card.appendChild(header);
-    card.appendChild(body);
-
-    this.contentStreamEl.appendChild(card);
-
-    const cardObj = {
-      cardEl: card,
-      headerEl: header,
-      statusEl: header.querySelector('.ic-status'),
-      elapsedEl: header.querySelector('.ic-elapsed'),
-      contentStreamEl: contentStreamEl,
-      resultSection: resultSection,
-      resultEl: resultEl,
-      currentTextSegment: null,
-      currentSegmentText: '',
-      callerName: null,
-      finishRendered: false
-    };
-
-    if (message) {
-      const msgEl = document.createElement('div');
-      msgEl.className = 'ic-delegation-msg';
-      msgEl.textContent = '💬 "' + message + '"';
-      bodyInner.insertBefore(msgEl, contentStreamEl);
-    }
-
-    return cardObj;
-  }
-
-  _ensureCardTextSegment(card) {
-    if (card.currentTextSegment) return;
-    const segment = document.createElement('div');
-    segment.className = 'text-segment ic-content';
-    card.contentStreamEl.appendChild(segment);
-    card.currentTextSegment = segment;
-    card.currentSegmentText = '';
-  }
-
-  _finalizeCardTextSegment(card) {
-    if (!card.currentTextSegment) return;
-    if (card.currentSegmentText.trim()) {
-      card.currentTextSegment.innerHTML = this.renderMarkdown(card.currentSegmentText);
-    } else {
-      card.currentTextSegment.remove();
-    }
-    card.currentTextSegment = null;
-    card.currentSegmentText = '';
-  }
-
-  _finalizeAgentCard(card, tokens, result) {
-    this._finalizeCardTextSegment(card);
-    if (tokens && tokens.trim()) {
-      card.resultEl.innerHTML = this.renderMarkdown(tokens);
-    }
-    if (result && result.trim()) {
-      card.resultEl.innerHTML = this.renderMarkdown(result);
-      card.resultSection.classList.add('visible');
-    }
-  }
-
-  _flushPendingTokens(agent) {
-    const pending = this.pendingTokens[agent];
-    if (!pending) return;
-    const card = this.subAgentCards[agent];
-    if (!card) return;
-    this._ensureCardTextSegment(card);
-    card.currentSegmentText += pending;
-    card.currentTextSegment.textContent = card.currentSegmentText;
-    card.contentStreamEl.scrollTop = card.contentStreamEl.scrollHeight;
-    delete this.pendingTokens[agent];
-  }
-
-  createToolCard(agentName, cardKey, toolName, args) {
-    const meta = this.agentMeta[agentName] || { icon: '🔆', label: agentName, color: '#6366f1' };
-
-    const card = document.createElement('div');
-    card.className = 'interaction-card tool-card';
-
-    const header = document.createElement('div');
-    header.className = 'ic-header';
-    header.innerHTML =
-      '<span class="ic-toggle">▼</span>' +
-      '<span class="ic-header-text">' +
-        '<span style="color:' + meta.color + '">' + meta.icon + ' ' + this.escapeHTML(meta.label) + '</span>' +
-        ' → ⚡ <strong>' + this.escapeHTML(toolName) + '</strong>()' +
-      '</span>' +
-      '<span class="ic-status done">Executed</span>';
-    header.addEventListener('click', () => card.classList.toggle('collapsed'));
-
-    const body = document.createElement('div');
-    body.className = 'ic-body';
-
-    const bodyInner = document.createElement('div');
-    bodyInner.className = 'ic-body-inner';
-
-    const argsEl = document.createElement('div');
-    argsEl.className = 'ic-tool-args';
-    argsEl.textContent = args ? JSON.stringify(args, null, 2) : '';
-
-    bodyInner.appendChild(argsEl);
-    body.appendChild(bodyInner);
-
-    card.appendChild(header);
-    card.appendChild(body);
-
-    if (this.subAgentCards[cardKey]) {
-      this.subAgentCards[cardKey].contentStreamEl.appendChild(card);
-    } else if (this.contentStreamEl) {
-      this.contentStreamEl.appendChild(card);
+  showError(message) {
+    const errorEl = document.createElement('div');
+    errorEl.className = 'error-message';
+    errorEl.textContent = message;
+    if (this.currentBubble) {
+      const content = this.currentBubble.querySelector('.message-content');
+      if (content) content.appendChild(errorEl);
     }
   }
 
@@ -1234,112 +718,64 @@ class OutObotChat {
     this.updateUIState();
   }
 
-  getAgentIcon(agentName) {
-    const meta = this.agentMeta[agentName] || {};
-    return meta.icon || '🔆';
+  updateUIState() {
+    const hasError = document.querySelector('.error-message');
+    this.els.sendBtn.disabled = this.processing || !this.ws || this.ws.readyState !== WebSocket.OPEN;
+    this.els.messageInput.disabled = this.processing;
   }
 
-  getAgentLabel(agentName) {
-    const meta = this.agentMeta[agentName] || {};
-    return meta.label || agentName;
-  }
-
-  getAgentColor(agentName) {
-    const meta = this.agentMeta[agentName] || {};
-    return meta.color || '#6366f1';
-  }
-
-  formatTime() {
-    return new Date().toLocaleTimeString([], { hour12: false });
-  }
-
-  truncateText(text, maxLen) {
-    if (!text) return '';
-    return text.length > maxLen ? text.substring(0, maxLen) + '...' : text;
-  }
-
-  escapeHTML(str) {
-    if (!str) return '';
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-  }
-
-  _splitReasoningTags(text) {
-    const pattern = /<(think|reasoning|thought)>([\s\S]*?)<\/\1>/gi;
-    const segments = [];
-    let lastIndex = 0;
-    let match;
-    while ((match = pattern.exec(text)) !== null) {
-      if (match.index > lastIndex) {
-        const before = text.slice(lastIndex, match.index);
-        if (before.trim()) segments.push({ type: 'text', content: before });
-      }
-      segments.push({ type: 'reasoning', content: match[2] });
-      lastIndex = match.index + match[0].length;
+  scrollToBottom(force = false) {
+    if (force || !this.userScrolledUp) {
+      this.els.chatArea.scrollTop = this.els.chatArea.scrollHeight;
     }
-    if (lastIndex < text.length) {
-      const remaining = text.slice(lastIndex);
-      const unclosed = remaining.match(/<(think|reasoning|thought)>([\s\S]*)$/i);
-      if (unclosed) {
-        const before = remaining.slice(0, unclosed.index);
-        if (before.trim()) segments.push({ type: 'text', content: before });
-        segments.push({ type: 'reasoning', content: unclosed[2] });
-      } else if (remaining.trim()) {
-        segments.push({ type: 'text', content: remaining });
-      }
-    }
-    return segments.length > 0 ? segments : [{ type: 'text', content: text }];
   }
 
-  _renderMarkdownInner(text) {
-    if (typeof marked !== 'undefined') {
-      try {
-        let html = marked.parse(text || '');
-        if (typeof hljs !== 'undefined') {
-          const temp = document.createElement('div');
-          temp.innerHTML = html;
-          temp.querySelectorAll('pre code').forEach((block) => {
-            hljs.highlightElement(block);
-          });
-          html = temp.innerHTML;
-        }
-        return html;
-      } catch (e) {
-        console.warn('marked.parse failed, using fallback:', e);
-      }
-    }
-    return this.escapeHTML(text || '');
+  autoResizeTextarea() {
+    const textarea = this.els.messageInput;
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
   }
 
-  renderMarkdown(text) {
-    const segments = this._splitReasoningTags(text);
-    let html = '';
-    for (const seg of segments) {
-      if (seg.type === 'reasoning') {
-        html += '<details class="reasoning-block"><summary class="reasoning-summary">' +
-          '🧠 Reasoning</summary><div class="reasoning-content">' +
-          this._renderMarkdownInner(seg.content) + '</div></details>';
-      } else {
-        html += this._renderMarkdownInner(seg.content);
-      }
+  handleFileSelect(e) {
+    const files = e.target.files;
+    if (!files.length) return;
+
+    for (const file of files) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        this.pendingAttachments.push({
+          name: file.name,
+          type: file.type,
+          data: ev.target.result
+        });
+        this.renderAttachmentPreview();
+      };
+      reader.readAsDataURL(file);
     }
-    return html;
+    e.target.value = '';
   }
 
-  addMessageTrail() {
-    const bubble = this.currentBubble;
-    if (!bubble) return;
-    const thinking = bubble.querySelector('.thinking-indicator');
-    if (thinking) thinking.remove();
-  }
-
-  showError(message) {
-    const errorEl = document.createElement('div');
-    errorEl.className = 'error-message';
-    errorEl.textContent = message;
-    if (this.currentBubble) {
-      const content = this.currentBubble.querySelector('.message-content');
-      if (content) content.appendChild(errorEl);
+  renderAttachmentPreview() {
+    const preview = this.els.attachmentPreview;
+    if (!preview) return;
+    
+    preview.innerHTML = '';
+    if (this.pendingAttachments.length === 0) {
+      preview.classList.add('hidden');
+      return;
     }
+    
+    preview.classList.remove('hidden');
+    this.pendingAttachments.forEach((att, idx) => {
+      const item = document.createElement('div');
+      item.className = 'attachment-item';
+      item.innerHTML = `<span class="attachment-name">${att.name}</span><button class="attachment-remove" data-idx="${idx}">×</button>`;
+      item.querySelector('.attachment-remove').addEventListener('click', () => {
+        this.pendingAttachments.splice(idx, 1);
+        this.renderAttachmentPreview();
+      });
+      preview.appendChild(item);
+    });
   }
 
   clearActivityLog() {
@@ -1347,302 +783,75 @@ class OutObotChat {
     this.els.activityLog.innerHTML = '<div class="activity-empty">No activity yet</div>';
   }
 
-  handleStreamEvent(data, bubble, currentContent) {
-    const contentEl = bubble.querySelector('.message-content');
-    const activityContainer = bubble.querySelector('.activity-container');
+  logActivity(text, type = '') {
+    if (!this.els.activityLog) return;
+    const entry = document.createElement('div');
+    entry.className = 'activity-entry ' + type;
+    entry.textContent = text;
+    const empty = this.els.activityLog.querySelector('.activity-empty');
+    if (empty) empty.remove();
+    this.els.activityLog.appendChild(entry);
+    this.els.activityLog.scrollTop = this.els.activityLog.scrollHeight;
+  }
 
-    switch (data.type) {
-      case 'token':
-        currentContent += data.content || '';
-        contentEl.innerHTML = marked.parse(currentContent);
-        this.scrollToBottom();
-        break;
-
-      case 'tool':
-      case 'agent':
-        this.logActivity(data.content);
-        if (activityContainer) {
-          const chip = document.createElement('div');
-          chip.className = 'activity-chip';
-          chip.textContent = data.content.substring(0, 50);
-          activityContainer.appendChild(chip);
-        }
-        this.scrollToBottom();
-        break;
-
-      case 'thinking':
-        this.logActivity(data.content);
-        break;
-
-      case 'error':
-        this.renderError(data.content, bubble);
-        this.logActivity(`Error: ${data.content}`, 'error');
-        break;
-
-      case 'finish':
-        if (data.session_id) {
-          this._lastSessionId = data.session_id;
-          this.currentSession = data.session_id;
-        }
-        break;
+  addLogEntry(icon, text, type = null, detail = null) {
+    if (!this.els.activityLog) return;
+    const entry = document.createElement('div');
+    entry.className = 'activity-entry ' + (type || '');
+    let html = `<span class="log-icon">${icon}</span><span class="log-text">${text}</span>`;
+    if (detail) {
+      html += `<span class="log-detail">${detail}</span>`;
     }
-
-    return currentContent;
+    entry.innerHTML = html;
+    const empty = this.els.activityLog.querySelector('.activity-empty');
+    if (empty) empty.remove();
+    this.els.activityLog.appendChild(entry);
+    this.els.activityLog.scrollTop = this.els.activityLog.scrollHeight;
   }
 
-  createAgentBubble(agentName, container) {
-    const meta = this.agentMeta[agentName] || { icon: '🔆', label: agentName, color: '#6366f1' };
-    const time = this.formatTime();
-    const bubble = document.createElement('div');
-    bubble.className = 'message agent';
-    bubble.innerHTML = `
-      <div class="message-avatar" style="background:${meta.color || '#6366f1'};color:var(--bg-primary);">${meta.icon || '🔆'}</div>
-      <div class="message-body">
-        <div class="message-header">
-          <span class="message-name" style="color:${meta.color || '#6366f1'}">${meta.label || agentName}</span>
-          <span class="message-time">${time}</span>
-        </div>
-        <div class="agent-activity"></div>
-        <div class="content-stream">
-          <div class="text-segment message-content"></div>
-        </div>
-        <div class="thinking-indicator hidden">
-          <div class="thinking-dots">
-            <span></span><span></span><span></span>
-          </div>
-          <span>Processing...</span>
-        </div>
-      </div>
-    `;
-    container.appendChild(bubble);
-    return bubble;
+  updateConnectionStatus(status) {
+    const el = this.els.connectionStatus;
+    if (!el) return;
+    el.className = 'connection-status ' + status;
+    const text = { connecting: 'Connecting...', connected: 'Connected', disconnected: 'Disconnected' };
+    el.textContent = text[status] || status;
   }
 
-  renderUserMessage(text, container) {
-    const msg = document.createElement('div');
-    msg.className = 'message user';
-    msg.innerHTML = `
-      <div class="message-avatar">👤</div>
-      <div class="message-body">
-        <div class="message-header">
-          <span class="message-name">You</span>
-        </div>
-        <div class="message-content">${marked.parse(text)}</div>
-      </div>
-    `;
-    container.appendChild(msg);
-    this.scrollToBottom();
-  }
-
-  renderAgentMessage(content, agentName, container) {
-    const bubble = this.createAgentBubble(agentName, container);
-    const contentStreamEl = bubble.querySelector('.content-stream');
-    if (contentStreamEl) {
-      const returnSection = document.createElement('div');
-      returnSection.className = 'ic-section ic-result-section visible main-return-section';
-      returnSection.innerHTML =
-        '<div class="ic-section-label">✦ Response</div>' +
-        '<div class="ic-content ic-result">' + marked.parse(content) + '</div>';
-      contentStreamEl.appendChild(returnSection);
-    }
-    this.scrollToBottom();
-  }
-
-  renderLoopInternalMessage(caller, target, content, container) {
-    const callerMeta = this.agentMeta[caller] || { icon: '🔆', label: caller, color: '#6366f1' };
-    const targetMeta = this.agentMeta[target] || { icon: '🔆', label: target, color: '#6366f1' };
-
-    const card = document.createElement('div');
-    card.className = 'interaction-card agent-card completed collapsed';
-    card.style.setProperty('--card-color', targetMeta.color);
-    card.dataset.depth = 0;
-
-    const header = document.createElement('div');
-    header.className = 'ic-header';
-    header.innerHTML =
-      '<span class="ic-toggle">▼</span>' +
-      '<span class="ic-header-text">' +
-        '<span style="color:' + callerMeta.color + '">' + callerMeta.icon + ' ' + this.escapeHTML(callerMeta.label) + '</span>' +
-        ' <span class="ic-arrow">→</span> ' +
-        '<span style="color:' + targetMeta.color + '">' + targetMeta.icon + ' ' + this.escapeHTML(targetMeta.label) + '</span>' +
-      '</span>' +
-      '<span class="ic-status done">Done</span>' +
-      '<span class="ic-elapsed"></span>';
-    header.addEventListener('click', () => card.classList.toggle('collapsed'));
-
-    const body = document.createElement('div');
-    body.className = 'ic-body';
-
-    const bodyInner = document.createElement('div');
-    bodyInner.className = 'ic-body-inner';
-
-    const contentStreamEl = document.createElement('div');
-    contentStreamEl.className = 'ic-content-stream';
-
-    const resultSection = document.createElement('div');
-    resultSection.className = 'ic-section ic-result-section visible';
-    resultSection.innerHTML =
-      '<div class="ic-section-label">✦ Result</div>' +
-      '<div class="ic-content ic-result">' + marked.parse(content) + '</div>';
-
-    bodyInner.appendChild(contentStreamEl);
-    bodyInner.appendChild(resultSection);
-    body.appendChild(bodyInner);
-    card.appendChild(header);
-    card.appendChild(body);
-    container.appendChild(card);
-    this.scrollToBottom();
-  }
-
-  renderError(errorText, bubble) {
-    const contentEl = bubble.querySelector('.message-content');
-    contentEl.innerHTML += `<div class="error-message">${errorText}</div>`;
-  }
-
-  showThinking(bubble) {
-    const indicator = bubble.querySelector('.thinking-indicator');
-    if (indicator) indicator.classList.remove('hidden');
-  }
-
-  hideThinking(bubble) {
-    const indicator = bubble.querySelector('.thinking-indicator');
-    if (indicator) indicator.classList.add('hidden');
-  }
-
-  async openSettings() {
-    this.els.settingsModal.classList.remove('hidden');
-    this.els.saveFeedback.textContent = '';
-    this.els.saveFeedback.className = 'save-feedback';
-
-    Object.entries(this.providerConfig).forEach(([key, val]) => {
-      const input = document.getElementById(`${key}KeyInput`);
-      const status = document.getElementById(`${key}Status`);
-      if (input && val) input.value = val.api_key || '';
-      if (status) this.setKeyStatus(status, val.enabled);
-    });
-
+  openSettings() {
+    this.syncSettingsInputs();
     this.populateDefaultProviderSelect();
     this.updateDefaultModels();
-    
-    const providers = ['openai', 'anthropic', 'google', 'minimax', 'glm', 'kimi'];
-    providers.forEach(key => {
-      const input = document.getElementById(`${key}KeyInput`);
-      if (input) {
-        input.oninput = () => {
-          this.populateDefaultProviderSelect();
-          this.updateDefaultModels();
-        };
+    this.els.settingsModal.classList.remove('hidden');
+  }
+
+  syncSettingsInputs() {
+    PROVIDER_KEYS.forEach(({ name, inputId }) => {
+      const input = document.getElementById(inputId);
+      if (!input) return;
+      const config = this.providerConfig[name];
+      if (config && config.api_key) {
+        input.value = config.api_key;
       }
     });
+    const defaultProvider = this.providerConfig.default_provider;
+    if (defaultProvider && this.els.defaultProviderSelect) {
+      this.els.defaultProviderSelect.value = defaultProvider;
+    }
+    const defaultModel = this.providerConfig.default_model;
+    if (defaultModel && this.els.defaultModelSelect) {
+      this.els.defaultModelSelect.value = defaultModel;
+    }
   }
 
   closeSettings() {
     this.els.settingsModal.classList.add('hidden');
   }
 
-  setKeyStatus(el, configured) {
-    if (configured) {
-      el.textContent = 'Configured';
-      el.className = 'key-status configured';
-    } else {
-      el.textContent = 'Not set';
-      el.className = 'key-status unconfigured';
-    }
-  }
-
-  async saveSettings() {
-    this.els.settingsSave.disabled = true;
-    this.els.saveFeedback.textContent = 'Saving...';
-    this.els.saveFeedback.className = 'save-feedback';
-
-    const config = {};
-    
-    const providers = ['openai', 'anthropic', 'google', 'minimax', 'glm', 'kimi'];
-    providers.forEach(key => {
-      const input = document.getElementById(`${key}KeyInput`);
-      const apiKey = input?.value?.trim() || '';
-      
-      config[key] = {
-        enabled: apiKey.length > 0,
-        api_key: apiKey,
-        model: ''
-      };
-    });
-
-    const defaultProvider = this.els.defaultProviderSelect?.value || '';
-    const defaultModel = this.els.defaultModelSelect?.value || '';
-    
-    if (defaultProvider && config[defaultProvider]) {
-      config[defaultProvider].model = defaultModel;
-    }
-
-    try {
-      const res = await fetch('/api/providers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config)
-      });
-
-      if (!res.ok) throw new Error('Failed to save');
-
-      await this.loadProviders();
-      
-      this.els.saveFeedback.textContent = 'Saved';
-      this.els.saveFeedback.className = 'save-feedback success';
-      
-      setTimeout(() => {
-        this.els.saveFeedback.textContent = '';
-        this.els.saveFeedback.className = 'save-feedback';
-      }, 3000);
-      
-      this.closeSettings();
-      this.checkWelcomeSetup();
-      this.logActivity('Settings saved');
-      
-    } catch (err) {
-      console.error('Save error:', err);
-      this.els.saveFeedback.textContent = 'Error saving';
-      this.els.saveFeedback.className = 'save-feedback error';
-    } finally {
-      this.els.settingsSave.disabled = false;
-    }
-  }
-
   async openSkills() {
-    this.els.skillsModal?.classList.remove('hidden');
-    this.renderSkillsList();
-  }
-
-  closeSkills() {
-    this.els.skillsModal?.classList.add('hidden');
-  }
-
-  async syncSkills() {
-    const btn = document.getElementById('syncSkillsBtn');
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = 'Syncing...';
-    }
-    
-    try {
-      const res = await fetch('/api/skills/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      
-      if (!res.ok) throw new Error('Failed to sync');
-      
+    if (this.els.skillsModal) {
       await this.loadSkills();
       this.renderSkillsList();
-      this.logActivity('Skills synced');
-    } catch (err) {
-      console.error('Sync error:', err);
-      this.logActivity('Failed to sync skills', 'error');
-    } finally {
-      if (btn) {
-        btn.disabled = false;
-        btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"/></svg> Sync Skills`;
-      }
+      this.els.skillsModal.classList.remove('hidden');
     }
   }
 
@@ -1671,158 +880,105 @@ class OutObotChat {
     });
   }
 
-  async installSkill() {
-    const input = document.getElementById('skillInstallInput');
-    const skillName = input?.value?.trim();
-    
-    if (!skillName) return;
-    
-    const btn = document.getElementById('installSkillBtn');
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = 'Installing...';
+  closeSkills() {
+    if (this.els.skillsModal) {
+      this.els.skillsModal.classList.add('hidden');
     }
+  }
+
+  async saveSettings() {
+    const providerKeys = ['openai', 'anthropic', 'google', 'minimax', 'glm', 'kimi'];
     
+    const newConfig = { ...this.providerConfig };
+    
+    providerKeys.forEach(key => {
+      const input = document.getElementById(`${key}KeyInput`);
+      const apiKey = input?.value?.trim() || '';
+      if (!newConfig[key]) {
+        newConfig[key] = { enabled: false, api_key: '', model: '' };
+      }
+      if (apiKey) {
+        newConfig[key].api_key = apiKey;
+        newConfig[key].enabled = true;
+      }
+    });
+
+    const defaultProvider = this.els.defaultProviderSelect?.value;
+    const defaultModel = this.els.defaultModelSelect?.value;
+    if (defaultProvider) newConfig.default_provider = defaultProvider;
+    if (defaultModel) newConfig.default_model = defaultModel;
+
     try {
-      const res = await fetch('/api/skills/install', {
+      const res = await fetch('/api/providers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: skillName })
+        body: JSON.stringify(newConfig)
       });
-      
-      if (!res.ok) throw new Error('Failed to install');
-      
-      await this.loadSkills();
-      this.renderSkillsList();
-      if (input) input.value = '';
-      this.logActivity(`Installed skill: ${skillName}`);
-    } catch (err) {
-      console.error('Install error:', err);
-      this.logActivity(`Failed to install: ${skillName}`, 'error');
-    } finally {
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = 'Install';
+
+      if (res.ok) {
+        this.showSaveFeedback('Settings saved!');
+        await this.loadProviders();
+        this.checkWelcomeSetup();
+        this.updateProviderStatuses();
+        this.closeSettings();
+      } else {
+        this.showSaveFeedback('Failed to save settings', true);
       }
+    } catch (err) {
+      this.showSaveFeedback('Error: ' + err.message, true);
     }
+  }
+
+  showSaveFeedback(message, isError = false) {
+    const el = this.els.saveFeedback;
+    if (!el) return;
+    el.textContent = message;
+    el.className = 'save-feedback ' + (isError ? 'error' : 'success');
+    el.classList.remove('hidden');
+    setTimeout(() => el.classList.add('hidden'), 3000);
   }
 
   toggleSidebar() {
     this.els.sidebar.classList.toggle('collapsed');
   }
 
-  updateConnectionStatus(state) {
-    const el = this.els.connectionStatus;
-    el.className = 'connection-status ' + state;
-    const textEl = el.querySelector('.status-text');
-    const labels = {
-      connecting: 'Connecting...',
-      connected: 'Connected',
-      disconnected: 'Disconnected'
-    };
-    textEl.textContent = labels[state] || state;
-  }
-
-  updateUIState() {
-    this.els.sendBtn.disabled = this.processing;
-    this.els.messageInput.disabled = this.processing;
-    this.els.attachBtn.disabled = this.processing;
-  }
-
-  logActivity(message, type = 'info') {
-    const log = this.els.activityLog;
-    const empty = log.querySelector('.activity-empty');
-    if (empty) empty.remove();
-
-    const entry = document.createElement('div');
-    entry.className = 'log-entry';
-    if (type === 'error') entry.classList.add('log-error');
-
-    const time = new Date().toLocaleTimeString([], { hour12: false });
-    
-    entry.innerHTML = `
-      <div class="log-main">
-        <span class="log-time">${time}</span>
-        <span class="log-text">${message}</span>
-      </div>
-    `;
-    
-    log.appendChild(entry);
-    log.scrollTop = log.scrollHeight;
-  }
-
-  addLogEntry(icon, message, type, details) {
-    const fullMessage = icon ? `${icon} ${message}` : message;
-    this.logActivity(fullMessage, type);
-  }
-
-  scrollToBottom(force = false) {
-    if (force || !this.userScrolledUp) {
-      this.els.chatArea.scrollTop = this.els.chatArea.scrollHeight;
+  async syncSkills() {
+    try {
+      const res = await fetch('/api/skills/sync', { method: 'POST' });
+      if (res.ok) {
+        await this.loadSkills();
+        this.showSaveFeedback('Skills synced!');
+      }
+    } catch (err) {
+      this.showSaveFeedback('Failed to sync skills', true);
     }
-    this.els.scrollBtn.classList.add('hidden');
   }
 
-  autoResizeTextarea() {
-    this.els.messageInput.style.height = 'auto';
-    this.els.messageInput.style.height = Math.min(this.els.messageInput.scrollHeight, 200) + 'px';
-  }
-
-  handleFileSelect(e) {
-    const files = Array.from(e.target.files);
-    if (!files.length) return;
-
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        this.pendingAttachments.push({
-          name: file.name,
-          type: file.type,
-          data: event.target.result
-        });
-        this.renderAttachmentPreview();
-      };
-      reader.readAsDataURL(file);
-    });
-
-    e.target.value = '';
-  }
-
-  renderAttachmentPreview() {
-    const preview = this.els.attachmentPreview;
-    preview.innerHTML = '';
+  async installSkill() {
+    const input = document.getElementById('skillUrlInput');
+    if (!input || !input.value.trim()) return;
     
-    if (this.pendingAttachments.length === 0) {
-      preview.style.display = 'none';
-      return;
-    }
-
-    preview.style.display = 'flex';
-    
-    this.pendingAttachments.forEach((file, idx) => {
-      const item = document.createElement('div');
-      item.className = 'attach-item';
-      item.innerHTML = `
-        <span class="attach-icon"></span>
-        <span class="attach-name">${file.name}</span>
-        <button class="attach-remove" data-index="${idx}"></button>
-      `;
-      item.querySelector('.attach-remove').addEventListener('click', (e) => {
-        const index = parseInt(e.target.dataset.index);
-        this.pendingAttachments.splice(index, 1);
-        this.renderAttachmentPreview();
+    try {
+      const res = await fetch('/api/skills/install', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: input.value.trim() })
       });
-      preview.appendChild(item);
-    });
-  }
-
-  clearAttachments() {
-    this.pendingAttachments = [];
-    this.els.attachmentPreview.innerHTML = '';
-    this.els.attachmentPreview.style.display = 'none';
+      
+      if (res.ok) {
+        await this.loadSkills();
+        this.showSaveFeedback('Skill installed!');
+        input.value = '';
+      } else {
+        this.showSaveFeedback('Failed to install skill', true);
+      }
+    } catch (err) {
+      this.showSaveFeedback('Error: ' + err.message, true);
+    }
   }
 }
 
+// Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
-  window.chat = new OutObotChat();
+  window.outobot = new OutObotChat();
 });

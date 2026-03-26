@@ -480,6 +480,10 @@ body {
   animation: fadeIn 0.5s ease;
 }
 
+.welcome.hidden {
+  display: none;
+}
+
 .welcome-icon {
   margin-bottom: 16px;
   display: flex;

@@ -112,6 +112,15 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
             # Collect raw events for session replay
             events = []
 
+            # Add user message as forward event for replay
+            events.append(
+                {
+                    "type": "forward",
+                    "agent_name": "user",
+                    "data": {"content": request.message},
+                }
+            )
+
             async for event in async_run_stream(
                 entry=agent,
                 message=message_with_attachments,
@@ -181,16 +190,22 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                         }
                     )
                 elif event.type == "agent_call":
-                    target = event.data.get("target", "agent")
+                    target = (
+                        event.data.get("target") or event.data.get("from") or "agent"
+                    )
+                    caller = event.agent_name
                     message = event.data.get("message", "")[:100]
-                    pending_delegations[target] = event.agent_name
+                    pending_delegations[event.call_id] = {
+                        "caller": caller,
+                        "target": target,
+                    }
                     event_data = {
                         "type": "agent_call",
-                        "agent_name": event.agent_name,
+                        "agent_name": caller,
                         "call_id": event.call_id,
                         "data": {
-                            "agent_name": event.agent_name,
-                            "from": target,
+                            "agent_name": target,
+                            "from": caller,
                             "message": message,
                         },
                     }
@@ -198,11 +213,11 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     events.append(
                         {
                             "type": "agent_call",
-                            "agent_name": event.agent_name,
+                            "agent_name": caller,
                             "call_id": event.call_id,
                             "data": {
-                                "agent_name": event.agent_name,
-                                "from": target,
+                                "agent_name": target,
+                                "from": caller,
                                 "message": message,
                             },
                         }
@@ -211,7 +226,12 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     result = event.data.get("result", "")
                     if isinstance(result, str):
                         result = result[:500] + "..." if len(result) > 500 else result
-                    caller = pending_delegations.pop(event.agent_name, event.agent_name)
+                    delegation = pending_delegations.pop(event.call_id, None)
+                    caller = (
+                        delegation.get("caller")
+                        if delegation
+                        else event.data.get("caller", event.agent_name)
+                    )
                     event_data = {
                         "type": "agent_return",
                         "agent_name": event.agent_name,
@@ -390,8 +410,14 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
 
         # Track pending delegations for caller→target mapping
         pending_delegations = {}
-        # Collect raw events for session replay
         events = []
+        events.append(
+            {
+                "type": "forward",
+                "agent_name": "user",
+                "data": {"content": request.message},
+            }
+        )
         output = None
 
         async for event in async_run_stream(
@@ -451,19 +477,31 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     }
                 )
             elif event.type == "agent_call":
+                target = event.data.get("target") or event.data.get("from") or "agent"
+                caller = event.agent_name
+                pending_delegations[event.call_id] = {
+                    "caller": caller,
+                    "target": target,
+                }
                 events.append(
                     {
                         "type": "agent_call",
-                        "agent_name": event.agent_name,
+                        "agent_name": caller,
                         "call_id": event.call_id,
                         "data": {
-                            "agent_name": event.agent_name,
-                            "from": event.data.get("target", ""),
+                            "agent_name": target,
+                            "from": caller,
                             "message": event.data.get("message", "")[:100],
                         },
                     }
                 )
             elif event.type == "agent_return":
+                delegation = pending_delegations.pop(event.call_id, None)
+                caller = (
+                    delegation.get("caller")
+                    if delegation
+                    else event.data.get("caller", event.agent_name)
+                )
                 events.append(
                     {
                         "type": "agent_return",
@@ -471,15 +509,12 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                         "call_id": event.call_id,
                         "data": {
                             "result": event.data.get("result", ""),
-                            "caller": pending_delegations.get(
-                                event.agent_name, event.agent_name
-                            ),
+                            "caller": caller,
                         },
                     }
                 )
                 # Save agent delegation result as loop-internal to session
                 result_content = event.data.get("result", "")
-                caller = pending_delegations.get(event.agent_name, event.agent_name)
                 session_messages.append(
                     {
                         "sender": event.agent_name,
@@ -666,8 +701,14 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
 
                 # Track pending delegations for caller→target mapping
                 pending_delegations = {}
-                # Collect raw events for session replay
                 events = []
+                events.append(
+                    {
+                        "type": "forward",
+                        "agent_name": "user",
+                        "data": {"content": message},
+                    }
+                )
 
                 try:
                     async for event in async_run_stream(
@@ -722,16 +763,23 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                             events.append(event_data)
                         elif event.type == "agent_call":
                             delegating_msg = event.data.get("message", "")[:100]
-                            target = event.data.get("from", "")
+                            target = (
+                                event.data.get("target")
+                                or event.data.get("from")
+                                or "agent"
+                            )
                             caller = event.agent_name
-                            pending_delegations[target] = caller
+                            pending_delegations[event.call_id] = {
+                                "caller": caller,
+                                "target": target,
+                            }
                             event_data = {
                                 "type": "agent_call",
-                                "agent_name": event.agent_name,
+                                "agent_name": caller,
                                 "call_id": event.call_id,
                                 "data": {
-                                    "agent_name": event.agent_name,
-                                    "from": event.data.get("from", ""),
+                                    "agent_name": target,
+                                    "from": caller,
                                     "message": delegating_msg,
                                 },
                             }
@@ -744,8 +792,11 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                                     if len(result) > 500
                                     else result
                                 )
-                            caller = pending_delegations.pop(
-                                event.agent_name, event.agent_name
+                            delegation = pending_delegations.pop(event.call_id, None)
+                            caller = (
+                                delegation.get("caller")
+                                if delegation
+                                else event.data.get("caller", event.agent_name)
                             )
                             event_data = {
                                 "type": "agent_return",
