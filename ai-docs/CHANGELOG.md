@@ -1,5 +1,74 @@
 # OutObot Changelog
 
+## 2026-03-29 - SSE ExecutionManager Unification & Execution Recovery
+
+### Summary
+
+SSE endpoint now uses ExecutionManager (same as WebSocket), enabling execution persistence across server restarts. Added execution state recovery for interrupted sessions.
+
+### Changes
+
+**`outo/server/execution.py` - ExecutionManager Enhancements:**
+- Added `_recovery_pending_executions()`: Recovers executions that were running when server shut down
+- Added `status="interrupted"`: Marked for executions that were `running` when server crashed
+- Added `interrupted` event type: Sent to frontend on reconnect for interrupted executions
+- Added `_transform_event()` method with fallback for transform_fn signature compatibility
+
+**`outo/server/session.py` - Execution State Persistence (NEW functions):**
+- `save_execution_state()`: Persists execution state to `sessions_dir/.executions/<session_id>.json`
+- `load_execution_state()`: Loads single execution state from disk
+- `load_all_execution_states()`: Loads all persisted execution states for recovery
+- `clear_execution_state()`: Removes persisted state after completion
+- `clear_finished_executions()`: Cleanup utility for all completed/error executions
+
+**`outo/server/routes/chat.py` - SSE Now Uses ExecutionManager:**
+- `/api/chat/stream` (SSE) now uses `exec_mgr.start()` and `exec_mgr.subscribe()` like WebSocket does
+- Both SSE and WebSocket now share the same execution persistence and recovery infrastructure
+- Event buffering, subscriber management, and reconnect support now work for SSE
+
+**`run.py`:**
+- Minor update (expanded from refactoring)
+
+### Architecture
+
+```
+Before (SSE):
+  chat_stream → async_run_stream → direct SSE yield
+  (no buffering, no persistence, no reconnect)
+
+After (SSE + WebSocket unified):
+  chat_stream → exec_mgr.start() → async_run_stream
+                ↓
+           ExecutionManager
+                ↓
+           events_buffer ← subscriber queues
+                ↓
+           SSE/WebSocket subscribe() → buffer replay → live events
+                ↓
+           Persisted to sessions_dir/.executions/ (for recovery)
+```
+
+### Recovery Flow
+
+1. Server starts → `ExecutionManager.initialize()` called
+2. `_recovery_pending_executions()` scans `sessions_dir/.executions/`
+3. For each `status="running"` state → creates `Execution` with `status="interrupted"`
+4. Frontend reconnects → sends `reconnect` message
+5. `subscribe()` detects `interrupted` status → sends `interrupted` event with buffer
+6. Frontend shows "Session was interrupted" message
+
+### Test Suite (`tests/test_execution.py`)
+- 8 async tests covering:
+  - Lifecycle: start → running → completed
+  - Buffering without subscribers
+  - Subscribe/unsubscribe with buffer replay
+  - Call stack tracking for agent delegation
+  - TTL cleanup after completion
+  - Concurrent subscribers
+  - Interrupted execution recovery and `interrupted` event
+
+---
+
 ## 2026-03-28 - Event Transform Extraction, ExecutionManager & WebSocket Reconnect
 
 ### Changes

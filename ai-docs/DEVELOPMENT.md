@@ -155,15 +155,28 @@ Modular server components extracted from run.py:
 
 Single function `transform_stream_event(event, session_id, pending_delegations)` that normalizes internal agent events into client-facing format for SSE/WebSocket delivery. Handles 8 event types: `token`, `tool_call`, `tool_result`, `agent_call`, `agent_return`, `thinking`, `error`, `finish`. Truncates long payloads (tool args: 100ch, tool results: 200ch, agent return results: 500ch). Manages `pending_delegations` dict (keyed by `call_id`) for caller/target tracking.
 
-### outo/server/execution.py (NEW)
+### outo/server/execution.py (ENHANCED)
 
-- `Execution` dataclass: Tracks session_id, status (`running`/`completed`/`error`), agent_name, call_stack, events_buffer, timestamps
-- `ExecutionManager` class: Manages concurrent agent executions for WebSocket
+- `Execution` dataclass: Tracks session_id, status (`running`/`completed`/`error`/`interrupted`), agent_name, call_stack, events_buffer, timestamps
+- `ExecutionManager` class: Manages concurrent agent executions for SSE and WebSocket
   - `start()`: Idempotent execution creation, spawns async task
   - `subscribe()`/`unsubscribe()`: Queue-based event delivery with buffer snapshot
   - `get()`/`get_active()`: Query execution state
   - Buffer TTL: 300 seconds after completion, then cleanup
-  - Used by WebSocket `/ws/chat` endpoint; enables reconnect support
+  - `_recovery_pending_executions()`: Recovers interrupted executions on startup
+  - `_transform_event()`: Wrapper with fallback for transform_fn compatibility
+  - Used by both SSE `/api/chat/stream` and WebSocket `/ws/chat`; enables unified execution persistence
+
+### outo/server/session.py (ENHANCED)
+
+Session load/save plus execution state persistence functions:
+- `load_session()` / `save_session()`: Session CRUD
+- `list_sessions()` / `clear_sessions()`: Session listing/cleanup
+- `save_execution_state()`: Persist to `sessions_dir/.executions/<session_id>.json`
+- `load_execution_state()`: Load single execution state
+- `load_all_execution_states()`: Load all persisted states for recovery
+- `clear_execution_state()`: Remove persisted state after completion
+- `clear_finished_executions()`: Cleanup all completed/error executions
 
 ### outo/agents.py
 
@@ -191,6 +204,14 @@ Single function `transform_stream_event(event, session_id, pending_delegations)`
 ---
 
 ## Recent Changes
+
+### SSE/WebSocket ExecutionManager Unification (2026-03-29)
+- SSE endpoint `/api/chat/stream` now uses ExecutionManager (same as WebSocket)
+- Execution state persists to `sessions_dir/.executions/` for server restart recovery
+- Added `_recovery_pending_executions()` to recover interrupted executions on startup
+- Added `interrupted` event type for frontend notification when reconnecting to interrupted session
+- `session.py` now contains execution state persistence functions alongside session functions
+- Updated test suite in `tests/test_execution.py` with 8 async tests
 
 ### Event Transform & Execution Manager (2026-03-28)
 - Extracted event transformation logic from chat.py into `outo/server/event_transform.py`
