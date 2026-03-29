@@ -26,6 +26,13 @@ SSE endpoint now uses ExecutionManager (same as WebSocket), enabling execution p
 - Both SSE and WebSocket now share the same execution persistence and recovery infrastructure
 - Event buffering, subscriber management, and reconnect support now work for SSE
 
+**Time Context Feature:**
+- Added `last_agent_response_at` field to `Execution` dataclass to track last agent response timestamp
+- When 1+ minutes have passed since last agent response, a system message is prepended to history:
+  `"[Time context] My last response to the user was X minutes/hours/days ago..."`
+- Applied to all three chat endpoints: `/api/chat`, `/api/chat/stream`, and `/ws/chat`
+- Helps agents understand if user is returning after a break, affecting response style
+
 **`run.py`:**
 - Minor update (expanded from refactoring)
 

@@ -174,6 +174,7 @@ def create_app() -> FastAPI:
     app.state.skills_sync_thread = None
     app.state.sessions_dir = SESSIONS_DIR
     app.state.execution_manager = ExecutionManager()
+    app.state.execution_manager.initialize(SESSIONS_DIR)
     app.state.upload_dir = UPLOAD_DIR
     app.state.static_dir = static_dir
 

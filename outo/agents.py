@@ -64,11 +64,17 @@ class AgentManager:
         skill_info = """
 ## Available Skills
 
-When you need to use a skill:
-1. First, read the skill documentation by using the Read tool to read the SKILL.md file in the skill folder
-2. The skill folder is located in: ~/.outobot/skills/<skill-name>/SKILL.md
-3. Understand the skill's purpose, when to use it, and how to use it
-4. Apply the skill instructions to complete the task
+You have these skills available. To use a skill:
+1. Read the skill documentation using run_bash: `cat ~/.outobot/skills/<skill-name>/SKILL.md`
+2. Understand the skill's purpose, when to use it, and how to use it
+3. Apply the skill instructions to complete the task
+
+**Available Skills:**
+- agent-browser: Browser automation CLI for AI agents (web interaction, form filling, scraping)
+- blender: Blender interface, workflows, and 3D production pipeline
+- find-skills: Helps discover and install new agent skills
+- outocut: OutOcut video editor - CLI commands, JSON project format, animation system
+- remotion: Best practices for Remotion - Video creation in React
 
 Skills are stored in ~/.outobot/skills/ directory. Each skill has a SKILL.md file with full documentation.
 

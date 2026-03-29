@@ -316,3 +316,51 @@ class TestExecutionManager:
 
             assert [e["type"] for e in received_1[:2]] == ["token", "finish"]
             assert [e["type"] for e in received_2[:2]] == ["token", "finish"]
+
+    @pytest.mark.asyncio
+    async def test_interrupted_execution_sends_interrupted_event(self, tmp_path):
+        """Test that subscribing to an interrupted execution sends an interrupted event."""
+        ExecutionManager = _load_execution_manager()
+
+        exec_mgr = ExecutionManager()
+        sessions_dir = tmp_path / "sessions"
+        sessions_dir.mkdir()
+
+        # Simulate recovered execution with interrupted status
+        exec_mgr._sessions_dir = sessions_dir
+        from outo.server.session import save_execution_state
+
+        save_execution_state(
+            session_id="test_interrupted",
+            sessions_dir=sessions_dir,
+            status="running",  # Was "running" when server crashed
+            agent_name="outo",
+            call_stack=[],
+            events_buffer=[
+                {"type": "token", "agent_name": "outo", "data": {"content": "Hello"}},
+            ],
+            started_at=0.0,
+        )
+
+        # Initialize to trigger recovery
+        exec_mgr._recovery_pending_executions()
+
+        # Verify execution was recovered as interrupted
+        execution = exec_mgr.get("test_interrupted")
+        assert execution is not None
+        assert execution.status == "interrupted"
+        assert len(execution.events_buffer) == 1
+
+        # Subscribe should return interrupted event
+        queue, buffer = exec_mgr.subscribe("test_interrupted")
+
+        # Buffer should contain the interrupted event first
+        assert buffer[0]["type"] == "interrupted"
+
+        # Queue should have interrupted event and None (end of stream)
+        evt = await asyncio.wait_for(queue.get(), timeout=0.1)
+        assert evt["type"] == "interrupted"
+
+        # Second should be None (end of stream)
+        evt = await asyncio.wait_for(queue.get(), timeout=0.1)
+        assert evt is None

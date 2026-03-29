@@ -127,26 +127,6 @@ def search_web(
 
 
 @Tool
-def read_file(
-    path: Annotated[str, "File path to read"],
-) -> str:
-    """Read contents of a file."""
-    with open(path, "r") as f:
-        return f.read()
-
-
-@Tool
-def write_file(
-    path: Annotated[str, "File path to write"],
-    content: Annotated[str, "Content to write"],
-) -> str:
-    """Write content to a file."""
-    with open(path, "w") as f:
-        f.write(content)
-    return f"Written to {path}"
-
-
-@Tool
 def run_bash(
     command: Annotated[str, "Command to execute"],
     timeout: Annotated[int, "Timeout in seconds"] = 60,
@@ -158,24 +138,6 @@ def run_bash(
         command, shell=True, capture_output=True, text=True, timeout=timeout
     )
     return result.stdout + result.stderr
-
-
-@Tool
-def search_code(
-    query: Annotated[str, "Code pattern to search for"],
-    path: Annotated[str, "Directory path to search"] = ".",
-    file_pattern: Annotated[str, "File pattern (e.g., *.py)"] = "*",
-) -> str:
-    """Search for code patterns in files."""
-    import subprocess
-
-    result = subprocess.run(
-        f"grep -r '{query}' {path} --include='{file_pattern}' -l",
-        shell=True,
-        capture_output=True,
-        text=True,
-    )
-    return result.stdout
 
 
 @Tool
@@ -397,10 +359,7 @@ def view_media(
 
 DEFAULT_TOOLS = [
     search_web,
-    read_file,
-    write_file,
     run_bash,
-    search_code,
     view_media,
     list_memories,
     recall_memory,

@@ -55,9 +55,9 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
 
         async def event_generator():
             from agentouto.message import Message  # pyright: ignore[reportMissingImports]
-            from agentouto.streaming import async_run_stream  # pyright: ignore[reportMissingImports]
 
             current_agent_manager = state_agent_manager
+            exec_mgr = getattr(req.app.state, "execution_manager", None)
 
             history = None
             session_messages = []
@@ -108,35 +108,49 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                 }
             )
 
-            # Track pending delegations for caller→target mapping
-            pending_delegations = {}
+            if not exec_mgr:
+                yield (
+                    "data: "
+                    + json.dumps(
+                        {
+                            "type": "error",
+                            "agent_name": "system",
+                            "data": {"message": "Execution manager not initialized"},
+                        }
+                    )
+                    + "\n\n"
+                )
+                return
 
-            async for event in async_run_stream(
-                entry=agent,
+            # Start execution via ExecutionManager for independent execution
+            await exec_mgr.start(
+                session_id=session_id,
+                agent=agent,
                 message=message_with_attachments,
                 agents=list(current_agent_manager.get_all_agents().values()),
                 tools=DEFAULT_TOOLS,
                 providers=list(provider_manager.providers.values()),
                 history=history,
-            ):
-                event_data = transform_stream_event(
-                    event, session_id, pending_delegations
-                )
-                if event.type == "finish":
-                    output = event.data.get("output", "")
-                    # Save session after finish
-                    session_messages.append(
-                        {
-                            "sender": request.agent,
-                            "content": output,
-                            "timestamp": datetime.now().isoformat(),
-                            "category": "top-level",
-                        }
-                    )
-                    save_session(session_id, session_messages, sessions_dir)
+                session_messages=session_messages,
+                sessions_dir=sessions_dir,
+                transform_fn=transform_stream_event,
+            )
 
-                if event_data:
-                    yield "data: " + json.dumps(event_data) + "\n\n"
+            # Subscribe to events for SSE streaming
+            queue, buffer = exec_mgr.subscribe(session_id)
+            try:
+                # First yield buffered events
+                for evt in buffer:
+                    yield "data: " + json.dumps(evt) + "\n\n"
+
+                # Then yield live events until execution completes
+                while True:
+                    evt = await queue.get()
+                    if evt is None:
+                        break
+                    yield "data: " + json.dumps(evt) + "\n\n"
+            finally:
+                exec_mgr.unsubscribe(session_id, queue)
 
         return StreamingResponse(event_generator(), media_type="text/event-stream")
 
@@ -219,6 +233,49 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                 "category": "user",
             }
         )
+
+        # Add time context to history if enough time has passed since last agent response
+        if history is not None:
+            last_agent_time = None
+            last_dt = None
+            for msg in session_messages[:-1]:
+                if msg.get("sender") == request.agent and msg.get("timestamp"):
+                    try:
+                        msg_dt = datetime.fromisoformat(msg["timestamp"])
+                        if last_dt is None or msg_dt > last_dt:
+                            last_dt = msg_dt
+                            last_agent_time = msg["timestamp"]
+                    except (ValueError, TypeError):
+                        continue
+            if last_agent_time:
+                try:
+                    last_dt = datetime.fromisoformat(last_agent_time)
+                    elapsed = datetime.now() - last_dt
+                    total_seconds = int(elapsed.total_seconds())
+                    if total_seconds >= 60:
+                        minutes = total_seconds // 60
+                        hours = minutes // 60
+                        days = hours // 24
+                        if days > 0:
+                            time_context = f"{days} day{'s' if days > 1 else ''} ago"
+                        elif hours > 0:
+                            time_context = f"{hours} hour{'s' if hours > 1 else ''} ago"
+                        else:
+                            time_context = (
+                                f"{minutes} minute{'s' if minutes > 1 else ''} ago"
+                            )
+                        history = list(history) if history else []
+                        history.insert(
+                            0,
+                            Message(
+                                type="system",
+                                sender="system",
+                                receiver=request.agent,
+                                content=f"[Time context] My last response to the user was {time_context}. The user is sending a new message after this gap, which may affect my response style and follow-up questions.",
+                            ),
+                        )
+                except (ValueError, TypeError, AttributeError):
+                    pass
 
         # Track pending delegations for caller→target mapping
         pending_delegations = {}
