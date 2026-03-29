@@ -1,5 +1,41 @@
 # OutObot Changelog
 
+## 2026-03-28 - Event Transform Extraction, ExecutionManager & WebSocket Reconnect
+
+### Changes
+
+Extracted event transformation into a dedicated module, added execution lifecycle management for WebSocket, and introduced reconnect support.
+
+**New Files:**
+- `outo/server/event_transform.py`: `transform_stream_event()` normalizes 8 internal event types into client-facing SSE/WebSocket format. Manages `pending_delegations` dict (keyed by `call_id`) for caller→target delegation tracking. Truncates long payloads (tool args: 100ch, tool results: 200ch, agent return: 500ch).
+- `outo/server/execution.py`: `ExecutionManager` class manages concurrent WebSocket executions. `Execution` dataclass tracks status (`running`/`completed`/`error`), call_stack, events_buffer, and timestamps. Supports subscriber queues with buffer snapshots for reconnect. Completed executions cleaned up after 300s TTL.
+
+**New REST Endpoints:**
+- `GET /api/execution/{session_id}`: Returns execution state (status, agent_name, call_stack, started_at, finished_at)
+- `GET /api/executions/active`: Returns list of all running executions
+
+**WebSocket Reconnect (`/ws/chat`):**
+- Client sends `{"type": "reconnect", "session_id": "..."}` to resume a disconnected session
+- Server responds with `execution_state` event (session_id, status, call_stack)
+- Replays buffered events, then continues streaming live events
+- New event types: `execution_started`, `execution_state` (WebSocket only)
+
+**Architecture Change (SSE vs WebSocket):**
+- SSE `/api/chat/stream`: Uses `transform_stream_event` directly in a generator (no buffering, no reconnect)
+- WebSocket `/ws/chat`: Uses `ExecutionManager.start()` with `transform_stream_event` as `transform_fn` (buffering, reconnect, concurrent subscribers)
+
+**Test Suite:**
+- `tests/conftest.py`: Shared fixtures (`MockStreamEvent`, `mock_event_sequence`, `simple_event_sequence`)
+- `tests/test_event_transform.py`: 12 tests covering all 8 event type transforms, truncation, delegation tracking
+- `tests/test_execution.py`: 8 async tests covering lifecycle (start→complete), buffering, subscribe/unsubscribe, call_stack, TTL cleanup, concurrent subscribers
+- `tests/test_sse_ws_parity.py`: Parametrized schema parity tests ensuring SSE and WebSocket emit identical event_data shapes
+
+### Documentation Corrections
+- Removed incorrect `data.caller` field from `agent_return` event docs (API.md)
+- Fixed `pending_delegations` keying in SESSIONS.md: now keyed by `call_id` (was incorrectly documented as keyed by target name)
+
+---
+
 ## 2026-03-24 - Agent Call ID Tracking
 
 ### Problem

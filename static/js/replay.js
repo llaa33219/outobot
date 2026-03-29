@@ -15,7 +15,6 @@ class SessionReplay {
    * Events are processed in order with delays to simulate real-time streaming
    */
   replaySession(events) {
-    // Reset all state
     this.chat.subAgentCards = {};
     this.chat.callStack = [];
     this.chat.agentTokens = {};
@@ -24,35 +23,33 @@ class SessionReplay {
     this.chat.agentStartTimes = {};
     this.chat.hasStreamedTopLevel = false;
     this.chat.messageContainer = null;
+    this.chat.currentFinishEl = null;
     this.chat.isReplaying = true;
 
-    // Track whether we've created the agent bubble
-    let agentBubbleCreated = false;
+    const displayEvents = events.filter(e =>
+      e.type === 'forward' || e.type === 'finish'
+    );
 
-    // Process events sequentially with delays
     let eventIndex = 0;
     const processNextEvent = () => {
-      if (eventIndex >= events.length) {
+      if (eventIndex >= displayEvents.length) {
         this.chat.isReplaying = false;
-        this.chat.addLogEntry('📜', `Replayed ${events.length} events`);
+        this.chat.addLogEntry('📜', `Replayed session`);
         return;
       }
 
-      const event = events[eventIndex];
-      const delay = this.calculateDelay(event, eventIndex, events);
+      const event = displayEvents[eventIndex];
+      const delay = event.type === 'finish' ? 300 : 50;
 
       setTimeout(() => {
-        // Special handling for forward event (user message)
         if (event.type === 'forward') {
-          // User message goes to chatArea (like live chat)
-          this.ui.renderUserMessage(event.data.content, null);
-        } else {
-          // For all other events, ensure agent bubble exists before processing
-          if (!agentBubbleCreated) {
-            this.chat.ensureAgentBubble('outo');
-            agentBubbleCreated = true;
+          this.ui.renderUserMessage(event.data.content || '', null);
+        } else if (event.type === 'finish') {
+          const output = event.data?.output || event.data?.message || '';
+          const agentName = event.agent_name || 'outo';
+          if (output) {
+            this.ui.renderAgentMessage(output, agentName, null);
           }
-          this.eventHandlers.handleEvent(event);
         }
 
         this.chat.scrollToBottom();
@@ -61,39 +58,7 @@ class SessionReplay {
       }, delay);
     };
 
-    // Start processing after a short initial delay
     setTimeout(processNextEvent, 100);
-  }
-
-  /**
-   * Calculate delay before processing next event
-   * Creates natural pacing during replay
-   */
-  calculateDelay(event, index, events) {
-    const baseDelay = 60;
-
-    // Token events get faster subsequent delays (streaming effect)
-    if (event.type === 'token') {
-      return 20;
-    }
-
-    // Agent call/return gets longer delay (significant events)
-    if (event.type === 'agent_call' || event.type === 'agent_return') {
-      return 150;
-    }
-
-    // Tool events get medium delay
-    if (event.type === 'tool_call' || event.type === 'tool_result') {
-      return 100;
-    }
-
-    // Finish event gets longer delay (let user read final response)
-    if (event.type === 'finish') {
-      return 300;
-    }
-
-    // Thinking and other events
-    return baseDelay;
   }
 
   /**
@@ -106,6 +71,7 @@ class SessionReplay {
     this.chat.currentBubble = null;
     this.chat.currentContentEl = null;
     this.chat.currentActivityEl = null;
+    this.chat.currentFinishEl = null;
     this.chat.contentStreamEl = null;
     this.chat.currentTextSegment = null;
     this.chat.currentSegmentText = '';

@@ -8,18 +8,8 @@ Run with:  pytest tests/test_sse_ws_parity.py -v
 from __future__ import annotations
 
 import pytest
-from dataclasses import dataclass, field
 from typing import Any
-
-
-# ----------------------------------------------------------------------
-# Minimal event fixture matching agentouto's streaming event shape
-# ----------------------------------------------------------------------
-@dataclass
-class MockEvent:
-    type: str
-    agent_name: str
-    data: dict[str, Any] = field(default_factory=dict)
+from tests.conftest import MockStreamEvent as MockEvent
 
 
 # ----------------------------------------------------------------------
@@ -53,8 +43,8 @@ WEB_SOCKET_SCHEMA = {
         "type": "agent_call",
         "agent_name": e.agent_name,
         "data": {
-            "agent_name": e.agent_name,
-            "from": e.data.get("target", "agent"),
+            "agent_name": e.data.get("target", "agent"),
+            "from": e.agent_name,
             "message": e.data.get("message", "")[:100],
         },
     },
@@ -78,6 +68,7 @@ WEB_SOCKET_SCHEMA = {
         "agent_name": e.agent_name,
         "data": {
             "message": e.data.get("output", ""),
+            "output": e.data.get("output", ""),
             "session_id": e.data.get("session_id", ""),
         },
     },
@@ -88,7 +79,7 @@ WEB_SOCKET_SCHEMA = {
 # SSE event_data builders — mirrors the SSE handler code exactly
 # (extracted from /api/chat/stream in outo/server/routes/chat.py)
 # ----------------------------------------------------------------------
-def sse_token_event_data(e: MockEvent) -> dict:
+def sse_token_event_data(e: MockEvent) -> dict[str, object]:
     return {
         "type": "token",
         "agent_name": e.agent_name,
@@ -96,7 +87,7 @@ def sse_token_event_data(e: MockEvent) -> dict:
     }
 
 
-def sse_tool_call_event_data(e: MockEvent) -> dict:
+def sse_tool_call_event_data(e: MockEvent) -> dict[str, object]:
     tool_name = e.data.get("name", "tool")
     tool_args = e.data.get("arguments", "")
     if isinstance(tool_args, dict):
@@ -115,7 +106,7 @@ def sse_tool_call_event_data(e: MockEvent) -> dict:
     }
 
 
-def sse_tool_result_event_data(e: MockEvent) -> dict:
+def sse_tool_result_event_data(e: MockEvent) -> dict[str, object]:
     result = e.data.get("result", "")
     if isinstance(result, str):
         result = result[:200] + "..." if len(result) > 200 else result
@@ -126,21 +117,22 @@ def sse_tool_result_event_data(e: MockEvent) -> dict:
     }
 
 
-def sse_agent_call_event_data(e: MockEvent) -> dict:
+def sse_agent_call_event_data(e: MockEvent) -> dict[str, object]:
     target = e.data.get("target", "agent")
+    caller = e.agent_name
     message = e.data.get("message", "")[:100]
     return {
         "type": "agent_call",
-        "agent_name": e.agent_name,
+        "agent_name": caller,
         "data": {
-            "agent_name": e.agent_name,
-            "from": target,
+            "agent_name": target,
+            "from": caller,
             "message": message,
         },
     }
 
 
-def sse_agent_return_event_data(e: MockEvent) -> dict:
+def sse_agent_return_event_data(e: MockEvent) -> dict[str, object]:
     result = e.data.get("result", "")
     if isinstance(result, str):
         result = result[:500] + "..." if len(result) > 500 else result
@@ -151,7 +143,7 @@ def sse_agent_return_event_data(e: MockEvent) -> dict:
     }
 
 
-def sse_thinking_event_data(e: MockEvent) -> dict:
+def sse_thinking_event_data(e: MockEvent) -> dict[str, object]:
     return {
         "type": "thinking",
         "agent_name": e.agent_name,
@@ -159,7 +151,7 @@ def sse_thinking_event_data(e: MockEvent) -> dict:
     }
 
 
-def sse_error_event_data(e: MockEvent) -> dict:
+def sse_error_event_data(e: MockEvent) -> dict[str, object]:
     return {
         "type": "error",
         "agent_name": e.agent_name,
@@ -167,11 +159,15 @@ def sse_error_event_data(e: MockEvent) -> dict:
     }
 
 
-def sse_finish_event_data(e: MockEvent, session_id: str) -> dict:
+def sse_finish_event_data(e: MockEvent, session_id: str) -> dict[str, object]:
     return {
         "type": "finish",
         "agent_name": e.agent_name,
-        "data": {"message": e.data.get("output", ""), "session_id": session_id},
+        "data": {
+            "message": e.data.get("output", ""),
+            "output": e.data.get("output", ""),
+            "session_id": session_id,
+        },
     }
 
 
@@ -200,6 +196,7 @@ def test_sse_event_data_matches_websocket_schema(event_type: str):
     e = MockEvent(
         type=event_type,
         agent_name="outo",
+        call_id="call_1",
         data={
             "text": "hello",
             "token": "hello",
@@ -232,24 +229,32 @@ def test_ws_tool_result_schema_no_extra_fields():
     e = MockEvent(
         type="tool_result",
         agent_name="outo",
+        call_id="call_1",
         data={"result": "ok", "tool_name": "foo", "attachments": []},
     )
-    ws = WEB_SOCKET_SCHEMA["tool_result"](e)
+    ws: dict[str, Any] = WEB_SOCKET_SCHEMA["tool_result"](e)
     assert set(ws["data"].keys()) == {"result"}
 
 
 def test_ws_agent_return_schema_no_caller():
     """WebSocket agent_return data contains only 'result', not 'caller'."""
-    e = MockEvent(type="agent_return", agent_name="outo", data={"result": "ok"})
-    ws = WEB_SOCKET_SCHEMA["agent_return"](e)
+    e = MockEvent(
+        type="agent_return", agent_name="outo", call_id="call_1", data={"result": "ok"}
+    )
+    ws: dict[str, Any] = WEB_SOCKET_SCHEMA["agent_return"](e)
     assert set(ws["data"].keys()) == {"result"}
 
 
 def test_ws_finish_schema_uses_message_key():
-    """WebSocket finish data uses 'message' key for output, not 'output'."""
+    """WebSocket finish data uses 'message' key for output, with 'output' also included for compatibility."""
     e = MockEvent(
-        type="finish", agent_name="outo", data={"output": "done", "session_id": "s1"}
+        type="finish",
+        agent_name="outo",
+        call_id="call_1",
+        data={"output": "done", "session_id": "s1"},
     )
     ws = WEB_SOCKET_SCHEMA["finish"](e)
     assert "message" in ws["data"]
-    assert "output" not in ws["data"]
+    assert "output" in ws["data"]
+    assert ws["data"]["message"] == "done"
+    assert ws["data"]["output"] == "done"

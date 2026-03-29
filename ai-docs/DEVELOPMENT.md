@@ -95,6 +95,8 @@ curl -sSL https://raw.githubusercontent.com/.../install.sh | bash
 │       ├── __init__.py   # Package exports
 │       ├── models.py     # Pydantic models (ChatMessage, ProviderConfig)
 │       ├── session.py    # Session management functions
+│       ├── event_transform.py  # Stream event normalization for SSE/WS
+│       ├── execution.py        # ExecutionManager for WS execution tracking
 │       └── routes/       # API route modules
 │           ├── __init__.py
 │           ├── static.py    # Static file serving
@@ -118,6 +120,11 @@ curl -sSL https://raw.githubusercontent.com/.../install.sh | bash
 ├── dev-reinstall.sh    # Developer reinstall script
 ├── logo.svg            # OutObot logo
 ├── ai-docs/            # This documentation
+├── tests/              # Test suite
+│   ├── conftest.py           # Shared fixtures (MockStreamEvent, event sequences)
+│   ├── test_event_transform.py  # Event transform unit tests
+│   ├── test_execution.py        # ExecutionManager async tests
+│   └── test_sse_ws_parity.py   # SSE/WS schema parity tests
 └── skills/             # Skills (symlink to ~/.outobot/skills in dev)
 ```
 
@@ -144,6 +151,20 @@ Modular server components extracted from run.py:
   - `chat.py`: Chat streaming & WebSocket API
   - `upload.py`: File upload API
 
+### outo/server/event_transform.py (NEW)
+
+Single function `transform_stream_event(event, session_id, pending_delegations)` that normalizes internal agent events into client-facing format for SSE/WebSocket delivery. Handles 8 event types: `token`, `tool_call`, `tool_result`, `agent_call`, `agent_return`, `thinking`, `error`, `finish`. Truncates long payloads (tool args: 100ch, tool results: 200ch, agent return results: 500ch). Manages `pending_delegations` dict (keyed by `call_id`) for caller/target tracking.
+
+### outo/server/execution.py (NEW)
+
+- `Execution` dataclass: Tracks session_id, status (`running`/`completed`/`error`), agent_name, call_stack, events_buffer, timestamps
+- `ExecutionManager` class: Manages concurrent agent executions for WebSocket
+  - `start()`: Idempotent execution creation, spawns async task
+  - `subscribe()`/`unsubscribe()`: Queue-based event delivery with buffer snapshot
+  - `get()`/`get_active()`: Query execution state
+  - Buffer TTL: 300 seconds after completion, then cleanup
+  - Used by WebSocket `/ws/chat` endpoint; enables reconnect support
+
 ### outo/agents.py
 
 - `AgentManager` class: Creates and manages all agent instances
@@ -169,7 +190,14 @@ Modular server components extracted from run.py:
 
 ---
 
-## Recent Changes (2026-03-17)
+## Recent Changes
+
+### Event Transform & Execution Manager (2026-03-28)
+- Extracted event transformation logic from chat.py into `outo/server/event_transform.py`
+- Added `ExecutionManager` in `outo/server/execution.py` for WebSocket execution tracking
+- WebSocket now uses ExecutionManager for event buffering, subscriber management, and reconnect support
+- Added REST endpoints: `GET /api/execution/{session_id}`, `GET /api/executions/active`
+- Added test suite: `tests/conftest.py`, `test_event_transform.py`, `test_execution.py`, `test_sse_ws_parity.py`
 
 ### Code Refactoring (2026-03-17)
 - Refactored run.py from 1300 lines to 128 lines

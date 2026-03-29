@@ -450,7 +450,7 @@ Agent delegation start. Indicates one agent has delegated a task to another agen
 Agent delegation complete. Indicates a sub-agent has finished its task and returned results.
 
 ```json
-{"type": "agent_return", "agent_name": "inquisitor", "call_id": "call_abc123", "data": {"result": "Research findings...", "caller": "outo"}}
+{"type": "agent_return", "agent_name": "inquisitor", "call_id": "call_abc123", "data": {"result": "Research findings..."}}
 ```
 
 **Fields:**
@@ -458,7 +458,6 @@ Agent delegation complete. Indicates a sub-agent has finished its task and retur
 - `agent_name`: The sub-agent that completed the task
 - `call_id`: Unique identifier matching the corresponding agent_call
 - `data.result`: The results returned by the sub-agent
-- `data.caller`: The agent that originally delegated (for nested delegations)
 
 ##### error
 
@@ -587,9 +586,33 @@ ws.onmessage = (event) => {
 };
 ```
 
-**Event Types:**
+**Client Message Types:**
 
-All WebSocket events have the same structure as SSE events described above, including the `call_id` field for correlating events with agent delegations.
+The WebSocket accepts two types of client messages:
+
+**1. Chat message** (start new execution):
+```json
+{
+  "message": "Hello",
+  "agent": "outo",
+  "session_id": "",
+  "attachments": []
+}
+```
+
+**2. Reconnect message** (resume disconnected session):
+```json
+{
+  "type": "reconnect",
+  "session_id": "session_20260315_143022"
+}
+```
+
+When reconnecting, the server responds with an `execution_state` event containing the current status and call stack, then replays all buffered events and continues streaming live events. Reconnect only works for sessions with a running execution. See the [Execution](#execution) section for execution lifecycle details.
+
+**Server Event Types:**
+
+All streaming event types (`token`, `tool_call`, `tool_result`, `agent_call`, `agent_return`, `thinking`, `error`, `finish`) have the same structure as SSE events described above, including the `call_id` field. The WebSocket additionally emits these events:
 
 | Type | Description |
 |------|-------------|
@@ -601,10 +624,130 @@ All WebSocket events have the same structure as SSE events described above, incl
 | `thinking` | Agent reasoning |
 | `error` | Error message |
 | `finish` | Complete |
+| `execution_started` | Acknowledgment after execution begins (WebSocket only) |
+| `execution_state` | Current execution state on reconnect (WebSocket only) |
+
+**WebSocket-only events:**
+
+##### execution_started
+
+Sent immediately after a new execution starts.
+
+```json
+{"type": "execution_started", "data": {"session_id": "session_20260315_143022"}}
+```
+
+##### execution_state
+
+Sent in response to a `reconnect` message. Contains current execution snapshot.
+
+```json
+{
+  "type": "execution_state",
+  "data": {
+    "session_id": "session_20260315_143022",
+    "status": "running",
+    "call_stack": [
+      {"call_id": "call_abc123", "agent_name": "inquisitor", "parent_call_id": null, "status": "active"}
+    ]
+  }
+}
+```
+
+**WebSocket Error Messages:**
+
+| Error | Condition |
+|-------|-----------|
+| `"Invalid JSON"` | Client sent unparseable message |
+| `"Empty message"` | Client sent blank message text |
+| `"System not initialized"` | Server not ready |
+| `"No providers configured. Please add API keys in Settings tab."` | No AI provider enabled |
+| `"Agent '{name}' not found."` | Invalid agent name |
+| `"Execution manager not initialized"` | ExecutionManager unavailable |
+
+All errors use format: `{"type": "error", "agent_name": "system", "data": {"message": "..."}}`
 
 **Example WebSocket token event:**
 ```json
 {"type": "token", "agent_name": "outo", "call_id": "call_abc123", "data": {"content": "Hello! "}}
+```
+
+**SSE vs WebSocket:**
+
+| Feature | SSE (`/api/chat/stream`) | WebSocket (`/ws/chat`) |
+|---------|--------------------------|------------------------|
+| Event transform | Direct (inline in generator) | Via `ExecutionManager` |
+| Reconnect support | No | Yes (`reconnect` message) |
+| Event buffering | No | Yes (via `ExecutionManager`) |
+| Multiple subscribers | No | Yes (concurrent queue subscribers) |
+| `execution_started` event | No | Yes |
+| `execution_state` event | No | Yes |
+
+---
+
+### Execution
+
+Query agent execution state. Executions are managed by `ExecutionManager` (`outo/server/execution.py`) and are only available while the server is running (not persisted to disk).
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/execution/{session_id}` | GET | Get execution state for a session |
+| `/api/executions/active` | GET | List all currently running executions |
+
+#### GET /api/execution/{session_id}
+
+Get the current execution state for a session.
+
+**Path Parameters:**
+- `session_id` (string, required): The session identifier
+
+**Response (found):**
+```json
+{
+  "status": "running",
+  "agent_name": "outo",
+  "call_stack": [
+    {
+      "call_id": "call_abc123",
+      "agent_name": "inquisitor",
+      "parent_call_id": null,
+      "status": "active"
+    }
+  ],
+  "started_at": 1711612800.0,
+  "finished_at": null
+}
+```
+
+**Response (not found):**
+```json
+{"status": "not_found"}
+```
+
+**Fields:**
+- `status`: Execution state (`"running"`, `"completed"`, `"error"`, or `"not_found"`)
+- `agent_name`: The primary agent handling this session
+- `call_stack`: Active agent delegation stack (empty when no sub-agents are active)
+- `started_at`: Unix timestamp when execution began
+- `finished_at`: Unix timestamp when execution completed (null if still running)
+
+**Note:** Completed executions are cleaned up after 300 seconds (5 minutes). After cleanup, the endpoint returns `{"status": "not_found"}`.
+
+#### GET /api/executions/active
+
+List all currently running executions.
+
+**Response:**
+```json
+[
+  {"session_id": "session_20260315_143022", "status": "running", "agent_name": "outo"},
+  {"session_id": "session_20260315_150045", "status": "running", "agent_name": "peritus"}
+]
+```
+
+**Response (no active executions):**
+```json
+[]
 ```
 
 ---

@@ -62,6 +62,7 @@ class OutObotChat {
     this.currentSession = null;
     this.sessions = [];
     this.processing = false;
+    this.wasProcessing = false;
     this.userScrolledUp = false;
     this.messageContainer = null;
     
@@ -70,16 +71,12 @@ class OutObotChat {
     this.maxReconnectDelay = 10000;
     this.reconnecting = false;
     this.currentBubble = null;
-    this.currentContentEl = null;
-    this.currentActivityEl = null;
+    this.currentFinishEl = null;
+    this.activityIndicator = null;
     this.activeAgents = new Set();
     this.involvedAgents = new Set();
     this.agentTokens = {};
     this.subAgentCards = {};
-    this.contentStreamEl = null;
-    this.currentTextSegment = null;
-    this.currentSegmentText = '';
-    this.hasStreamedTopLevel = false;
     this.callStack = [];
     this.agentStartTimes = {};
     this.agentMeta = AGENT_DEFAULTS;
@@ -238,13 +235,19 @@ class OutObotChat {
       this.reconnectDelay = 1000;
       this.reconnecting = false;
       this.logActivity('Connected to server');
+      if (this.wasProcessing && this.currentSession) {
+        this.ws.send(JSON.stringify({
+          type: 'reconnect',
+          session_id: this.currentSession
+        }));
+        this.wasProcessing = false;
+      }
     };
 
     this.ws.onclose = () => {
       this.updateConnectionStatus('disconnected');
       if (this.processing) {
-        this.setProcessing(false);
-        this.deactivateAllAgents();
+        this.wasProcessing = true;
       }
       this.reconnecting = true;
       setTimeout(() => {
@@ -260,11 +263,40 @@ class OutObotChat {
     this.ws.onmessage = (e) => {
       try {
         const event = JSON.parse(e.data);
+        if (event.type === 'execution_state') {
+          this.handleExecutionStateRestore(event.data);
+          return;
+        }
+        if (event.type === 'execution_started') {
+          return;
+        }
         this.eventHandlers.handleEvent(event);
       } catch (err) {
         console.error('Failed to parse event:', err);
       }
     };
+  }
+
+  handleExecutionStateRestore(stateData) {
+    if (stateData && stateData.session_id) {
+      this.currentSession = stateData.session_id;
+    }
+    this.setProcessing(true);
+    this.subAgentCards = {};
+    this.callStack = [];
+    this.agentTokens = {};
+    this.pendingTokens = {};
+    this.pendingAgentCalls.clear();
+    this.agentStartTimes = {};
+    this.hasStreamedTopLevel = false;
+    this.currentBubble = null;
+    this.currentFinishEl = null;
+    this.contentStreamEl = null;
+    this.currentTextSegment = null;
+    this.currentSegmentText = '';
+    this.activeAgents.clear();
+    this.involvedAgents.clear();
+    this.logActivity('Reconnected to running execution');
   }
 
   loadSessionData(sessionId) {
@@ -539,6 +571,7 @@ class OutObotChat {
     this.currentBubble = null;
     this.currentContentEl = null;
     this.currentActivityEl = null;
+    this.currentFinishEl = null;
     this.contentStreamEl = null;
     this.currentTextSegment = null;
     this.currentSegmentText = '';
@@ -614,15 +647,12 @@ class OutObotChat {
     this.els.messageInput.value = '';
     this.autoResizeTextarea();
     this.setProcessing(true);
+    this.wasProcessing = false;
     this.activeAgents.clear();
     this.involvedAgents.clear();
     this.currentBubble = null;
-    this.currentContentEl = null;
-    this.currentActivityEl = null;
-    this.contentStreamEl = null;
-    this.currentTextSegment = null;
-    this.currentSegmentText = '';
-    this.hasStreamedTopLevel = false;
+    this.currentFinishEl = null;
+    this.activityIndicator = null;
     this.agentTokens = {};
     this.subAgentCards = {};
     this.callStack = [];
@@ -630,6 +660,7 @@ class OutObotChat {
     this.pendingAgentCalls.clear();
     this.agentStartTimes = {};
     this.clearActivityLog();
+    this.eventHandlers.reset();
     this.addLogEntry('💬', '<strong>User</strong> message sent');
   }
 
@@ -658,11 +689,8 @@ class OutObotChat {
     const bubbleData = this.ui.createAgentBubbleElement(agentName);
     this.els.chatArea.appendChild(bubbleData.element);
     this.currentBubble = bubbleData.element;
-    this.contentStreamEl = bubbleData.contentStream;
-    this.currentTextSegment = bubbleData.textSegment;
-    this.currentSegmentText = '';
-    this.currentContentEl = bubbleData.textSegment;
-    this.currentActivityEl = bubbleData.activity;
+    this.activityIndicator = bubbleData.activityIndicator;
+    this.currentFinishEl = bubbleData.finishContent;
     this.involvedAgents.add(agentName);
     return this.currentBubble;
   }
@@ -687,6 +715,16 @@ class OutObotChat {
   addActivityChip(type, text) {
     const activity = this.currentActivityEl;
     if (!activity) return;
+    const existing = activity.querySelector('.activity-chip.' + type);
+    if (existing) {
+      if (text === null || text === '') {
+        existing.remove();
+      } else {
+        existing.textContent = text;
+      }
+      return;
+    }
+    if (text === null || text === '') return;
     const chip = document.createElement('div');
     chip.className = 'activity-chip ' + type;
     chip.textContent = text;
@@ -719,8 +757,8 @@ class OutObotChat {
   }
 
   updateUIState() {
-    const hasError = document.querySelector('.error-message');
-    this.els.sendBtn.disabled = this.processing || !this.ws || this.ws.readyState !== WebSocket.OPEN;
+    const isConnected = this.ws && this.ws.readyState === WebSocket.OPEN;
+    this.els.sendBtn.disabled = this.processing || !isConnected;
     this.els.messageInput.disabled = this.processing;
   }
 

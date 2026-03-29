@@ -1091,22 +1091,6 @@ body {
   opacity: 1;
 }
 
-.main-return-section.visible {
-  margin-top: 14px;
-  padding: 18px 20px;
-  box-shadow: var(--shadow-lg);
-}
-
-.main-return-section .ic-section-label {
-  font-size: 0.78rem;
-  letter-spacing: 0.1em;
-}
-
-.main-return-section .ic-result {
-  font-size: 0.92rem;
-  max-height: 500px;
-}
-
 .ic-thinking {
   display: flex;
   align-items: center;
@@ -2683,7 +2667,56 @@ body {
   color: var(--text-muted);
 }
 
-/* ── Content Stream ─────────────────────────────────── */
+/* ── Activity Indicator (loading during execution) ─── */
+
+.activity-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-top: 8px;
+  background: var(--bg-secondary);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.activity-indicator .thinking-dots {
+  display: flex;
+  gap: 3px;
+}
+
+.activity-indicator .thinking-dots span {
+  width: 4px;
+  height: 4px;
+  background: var(--text-muted);
+  animation: bounce 1.4s infinite ease-in-out both;
+}
+
+.activity-indicator .thinking-dots span:nth-child(1) { animation-delay: -0.32s; }
+.activity-indicator .thinking-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1); }
+}
+
+.activity-indicator .activity-text {
+  color: var(--text-secondary);
+}
+
+/* ── Finish Content (final output after finish) ────── */
+
+.finish-content {
+  margin-top: 8px;
+  padding: 12px;
+  background: var(--bg-secondary);
+}
+
+.finish-content:empty {
+  display: none;
+}
+
+/* ── Content Stream (legacy - keep for compatibility) ─── */
 
 .content-stream {
   display: flex;
@@ -2807,12 +2840,6 @@ body {
 
 .ic-result-section.visible {
   display: block;
-}
-
-.main-return-section {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 2px solid var(--border);
 }
 
 /* ── Activity Chips ─────────────────────────────────── */

@@ -145,10 +145,10 @@ Session auto-saved after each message exchange via any chat endpoint:
 5. save_session() called with complete conversation history and events array
 
 **Caller Tracking:**
-When agents delegate, the caller→target relationship is tracked via `pending_delegations`:
-- `agent_call`: `pending_delegations[target] = caller`
-- `agent_return`: `caller = pending_delegations.pop(event.agent_name)`
-- The `caller` field is stored in loop-internal messages for proper UI rendering
+When agents delegate, the caller→target relationship is tracked via `pending_delegations`, keyed by `call_id`:
+- `agent_call`: `pending_delegations[event.call_id] = {"caller": caller, "target": target}`
+- `agent_return`: `pending_delegations.pop(event.call_id, None)`
+- The delegation mapping is used by `transform_stream_event` (in `outo/server/event_transform.py`) to construct normalized event data
 
 ### 4. Clearing
 
@@ -234,6 +234,7 @@ Real-time bidirectional chat with automatic session management.
 - History automatically loaded and passed to agent
 - Session saved on finish event with full conversation
 - Raw events stored for bit-for-bit identical replay on session load
+- Reconnect support: WebSocket clients can send `{"type": "reconnect", "session_id": "..."}` to resume a running execution after disconnect. Buffered events are replayed and live streaming continues. See API.md WebSocket section for details.
 
 ### SSE Streaming /api/chat/stream
 

@@ -160,33 +160,25 @@ class UIRenderer {
     header.className = 'message-header';
     header.innerHTML = '<span class="message-name" style="color:' + (meta.color || '#6366f1') + '">' + (meta.label || agentName) + '</span><span class="message-time">' + time + '</span>';
 
-    const activity = document.createElement('div');
-    activity.className = 'agent-activity';
+    // Single activity indicator - shows current action during execution
+    const activityIndicator = document.createElement('div');
+    activityIndicator.className = 'activity-indicator';
+    activityIndicator.innerHTML = '<div class="thinking-dots"><span></span><span></span><span></span></div><span class="activity-text">Processing...</span>';
 
-    const thinking = document.createElement('div');
-    thinking.className = 'thinking-indicator';
-    thinking.innerHTML = '<div class="thinking-dots"><span></span><span></span><span></span></div><span>Processing...</span>';
-
-    const contentStream = document.createElement('div');
-    contentStream.className = 'content-stream';
-
-    const textSegment = document.createElement('div');
-    textSegment.className = 'text-segment message-content';
-    contentStream.appendChild(textSegment);
+    // Final output container - shown after finish
+    const finishContent = document.createElement('div');
+    finishContent.className = 'finish-content message-content';
 
     body.appendChild(header);
-    body.appendChild(activity);
-    body.appendChild(contentStream);
-    body.appendChild(thinking);
+    body.appendChild(activityIndicator);
+    body.appendChild(finishContent);
     msg.appendChild(avatar);
     msg.appendChild(body);
 
     return {
       element: msg,
-      activity,
-      contentStream,
-      textSegment,
-      thinking
+      activityIndicator,
+      finishContent
     };
   }
 

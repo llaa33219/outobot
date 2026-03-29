@@ -31,6 +31,7 @@ from outo import (
     ProviderManager,
     AgentManager,
 )
+from outo.server.execution import ExecutionManager  # pyright: ignore[reportMissingImports]
 
 get_skills_manager = import_module("outo.skills").get_skills_manager
 
@@ -172,6 +173,7 @@ def create_app() -> FastAPI:
     app.state.skills_sync_shutdown = threading.Event()
     app.state.skills_sync_thread = None
     app.state.sessions_dir = SESSIONS_DIR
+    app.state.execution_manager = ExecutionManager()
     app.state.upload_dir = UPLOAD_DIR
     app.state.static_dir = static_dir
 
