@@ -40,6 +40,7 @@
 - [ ] `outo/skills.py` 변경 → `SKILLS.md` 확인
 - [ ] `outo/tools.py` 변경 → `TOOLS.md` 확인
 - [ ] `run.py` 변경 → `API.md`, `DEVELOPMENT.md` 확인
+- [ ] `outo/server/discord_bot.py` 변경 → `CONFIG.md`, `API.md` 확인
 - [ ] provider/agent 수 변경 → `README.md` 확인
 - [ ] 새로운 파일 생성 → `DEVELOPMENT.md` 구조 업데이트
 - [ ] 문서 내 provider 수, agent 수 등이 정확한지 확인
@@ -59,6 +60,9 @@ outo/
 
 run.py           → API.md (API 엔드포인트)
                  → DEVELOPMENT.md (프로젝트 구조)
+
+outo/server/discord_bot.py → CONFIG.md (Discord 설정)
+                           → API.md (Discord API 엔드포인트)
 ```
 
 ### 확인해야 할 주요 사항:

@@ -97,6 +97,7 @@ curl -sSL https://raw.githubusercontent.com/.../install.sh | bash
 │       ├── session.py    # Session management functions
 │       ├── event_transform.py  # Stream event normalization for SSE/WS
 │       ├── execution.py        # ExecutionManager for WS execution tracking
+│       ├── discord_bot.py      # Discord bot integration (OutobotDiscord class)
 │       └── routes/       # API route modules
 │           ├── __init__.py
 │           ├── static.py    # Static file serving
@@ -142,6 +143,7 @@ Modular server components extracted from run.py:
 
 - **`models.py`**: Pydantic models (`ChatMessage`, `ProviderConfig`)
 - **`session.py`**: Session load/save/list/clear functions
+- **`discord_bot.py`**: Discord bot integration - `OutobotDiscord` class that connects to Discord, handles @mentions, manages per-channel sessions
 - **`routes/`**: API endpoint modules
   - `static.py`: Static file serving (`/`, `/setup`, `/logo.svg`)
   - `providers.py`: Provider configuration API
@@ -178,6 +180,17 @@ Session load/save plus execution state persistence functions:
 - `clear_execution_state()`: Remove persisted state after completion
 - `clear_finished_executions()`: Cleanup all completed/error executions
 
+### outo/server/discord_bot.py (NEW)
+
+- `OutobotDiscord` class: Discord bot that responds to @mentions
+- `load_discord_config()`: Loads Discord configuration from `~/.outobot/config/discord.json`
+- `split_message()`: Splits long messages into Discord-compatible chunks (2000 char limit)
+- `strip_bot_mention()`: Removes @bot mention from message content
+- `build_session_id()`: Creates session IDs from guild/channel IDs
+- Session IDs: `discord_{guild_id}_{channel_id}` for guilds, `discord_dm_{channel_id}` for DMs
+- Started in `run.py` lifespan if config exists and is enabled
+- Hot-reload support: `reload()` method for token changes
+
 ### outo/agents.py
 
 - `AgentManager` class: Creates and manages all agent instances
@@ -204,6 +217,28 @@ Session load/save plus execution state persistence functions:
 ---
 
 ## Recent Changes
+
+### Discord Bot Integration (2026-04-01)
+- Added `outo/server/discord_bot.py` with `OutobotDiscord` class
+- Discord bot responds to @mentions in guild channels and DMs
+- Per-channel persistent sessions using `discord_{guild}_{channel}` format
+- Message splitting for Discord's 2000 character limit
+- Time context awareness (same as web sessions)
+- Hot-reload support via settings UI
+- New API endpoints: `GET /api/discord`, `POST /api/discord`
+- Added `discord.py` dependency to install.sh
+- Settings UI includes Discord Bot configuration section
+
+### GLM Coding Plan UI (2026-04-01)
+- Added GLM Coding Plan to the provider dropdown and settings UI
+- Previously available in backend but not in the web UI
+
+### Frontend Improvements (2026-04-01)
+- `events.js`: Finish events now only process for the top-level agent (sub-agent finishes ignored)
+- `ui.js`: `renderAgentMessage()` now uses `activityIndicator` and `finishContent` instead of removed `thinking` and `textSegment`
+- `script.js`: WebSocket reconnect now uses `restoreActiveExecution()` (queries `/api/executions/active`)
+- Replaced `wasProcessing` flag with `restoreActiveExecution()` for more reliable reconnect
+- Added `_sentAgent` tracking to properly filter finish events
 
 ### SSE/WebSocket ExecutionManager Unification (2026-03-29)
 - SSE endpoint `/api/chat/stream` now uses ExecutionManager (same as WebSocket)
@@ -264,6 +299,14 @@ Session load/save plus execution state persistence functions:
 - Now copies ai-docs/ to ~/.outobot/
 - Now copies static/ to ~/.outobot/
 - Preserves user settings and sessions on update
+
+---
+
+## Dependencies
+
+| Package | Purpose |
+|---------|---------|
+| discord.py | Discord bot integration |
 
 ---
 

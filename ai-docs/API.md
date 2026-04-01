@@ -106,6 +106,53 @@ Save provider configuration.
 }
 ```
 
+### Discord
+
+Manage Discord bot configuration.
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/discord` | GET | Get Discord bot configuration |
+| `/api/discord` | POST | Save Discord bot configuration |
+
+#### GET /api/discord
+
+Get Discord bot configuration.
+
+**Response:**
+```json
+{
+  "enabled": false,
+  "token": "********"
+}
+```
+
+Token is masked as `"********"` when a token is stored.
+
+#### POST /api/discord
+
+Save Discord bot configuration.
+
+**Request Body:**
+```json
+{
+  "enabled": true,
+  "token": "your-discord-bot-token"
+}
+```
+
+**Behavior:**
+- If `token` is `"********"`, the existing token is kept (masked value is not saved).
+- If enabled and a token is available, the bot starts (if not running) or reloads (if token changed).
+- If disabled, the bot is stopped.
+
+**Response:**
+```json
+{
+  "status": "saved"
+}
+```
+
 ---
 
 ### Skills

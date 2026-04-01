@@ -244,6 +244,53 @@ GLM_API_KEY=your-glm-key-here
 KIMI_API_KEY=your-kimi-key-here
 ```
 
+## Discord Bot Configuration
+
+Location: `~/.outobot/config/discord.json`
+
+Discord bot settings are stored separately from `providers.json`.
+
+```json
+{
+  "enabled": true,
+  "token": "your-discord-bot-token"
+}
+```
+
+### Configuration Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| enabled | boolean | Enable/disable Discord bot |
+| token | string | Discord bot token from Developer Portal |
+
+### How to Get a Discord Bot Token
+
+1. Go to Discord Developer Portal (https://discord.com/developers/applications)
+2. Create a new application
+3. Go to Bot section and create a bot
+4. Copy the bot token
+5. Enable MESSAGE CONTENT INTENT in Bot settings
+
+### Configure via Web UI
+
+1. Open http://localhost:7227
+2. Go to Settings
+3. Open Discord Bot section
+4. Enable bot and paste token
+5. Save configuration
+
+### Configure via API
+
+- `GET /api/discord`
+- `POST /api/discord`
+
+### Bot Behavior
+
+- Only responds to @mentions
+- Maintains per-channel sessions
+- Splits responses longer than 2000 characters into multiple messages
+
 ## Web UI Configuration
 
 The easiest way to configure OutObot is via the web UI:
@@ -324,6 +371,7 @@ OutObot requires the following Python packages:
 | agentouto | Multi-agent framework |
 | wsproto | WebSocket protocol support |
 | websockets | WebSocket server implementation |
+| discord.py | Discord bot integration |
 
 **Important:** Always use `uvicorn[standard]` (not plain `uvicorn`) to ensure WebSocket support is installed. The `[standard]` extra includes the `websockets` library required for real-time chat.
 

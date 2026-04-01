@@ -62,7 +62,7 @@ This document describes the frontend style changes applied to OutObot, integrati
 - **Message Types**: User messages (right-aligned, black bg), Agent messages (left-aligned, white bg, shadow)
 
 ### Input Area
-- Provider/Model selectors
+- Provider/Model selectors (provider dropdown includes GLM Coding Plan)
 - Custom model input field
 - File attachment button
 - Text input (textarea with auto-resize)
@@ -74,9 +74,17 @@ This document describes the frontend style changes applied to OutObot, integrati
 - **Session Continuity**: Previous messages automatically loaded when continuing a session
 
 ### Settings Modal
-- API Key configuration for 8 providers
+- API Key configuration for 8 providers (OpenAI, Anthropic, Google, MiniMax, GLM, GLM Coding Plan, Kimi, Kimi Code Plan)
+- GLM Coding Plan now has its own dedicated API key input field in the UI
 - Default provider/model selection
 - Save/Cancel actions
+
+#### Discord Bot Configuration
+- 🤖 Discord Bot section with token input and enable/disable toggle
+- **Discord Bot Token**: password input with show/hide toggle
+- **Enable**: dropdown with `Disabled` / `Enabled` options
+- Discord status indicator shows `✓` when enabled and token is set
+- Discord settings are loaded/saved via `/api/discord` (GET/POST)
 
 ### Interactive Components
 - **Interaction Cards**: Expandable cards for tool calls and agent delegations
@@ -134,6 +142,7 @@ The frontend uses the following existing API endpoints:
 | `/api/skills` | GET | List skills |
 | `/api/skills/sync` | POST | Sync skills from agents |
 | `/api/skills/install` | POST | Install new skill |
+| `/api/discord` | GET/POST | Discord bot configuration |
 
 ## Technical Notes
 
