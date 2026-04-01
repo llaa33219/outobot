@@ -45,12 +45,14 @@ Open http://localhost:7227 in your browser.
 
 Go to the **Settings** tab and enter API keys for your preferred AI provider:
 
-- **OpenAI** - GPT models (gpt-5.2, o3, o4-mini)
+- **OpenAI** - GPT models (gpt-5.4, o3, o4-mini)
 - **Anthropic** - Claude models (claude-opus-4-6, claude-sonnet-4-6)
 - **Google** - Gemini models (gemini-3.1-pro, gemini-3-flash)
-- **MiniMax** - Chinese multilingual model (M2.5)
+- **MiniMax** - Chinese multilingual model (M2.7)
 - **GLM** - Chinese bilingual model (GLM-5)
+- **GLM Coding Plan** - GLM coding-optimized model (GLM-5)
 - **Kimi** - Moonshot AI (kimi-k2.5)
+- **Kimi Code Plan** - Kimi coding-optimized model (kimi-k2.5)
 
 Check "Enable", enter your API key, select a model, then click **Save Configuration**.
 
@@ -79,6 +81,12 @@ Remembers your previous conversations so you can continue where you left off.
 - Conversations are saved automatically
 - Load previous conversations from the session list
 - Start a new conversation with "New Session"
+
+### Discord Bot Integration
+Connect OutObot to your Discord server. The bot responds when @mentioned in channels or DMs:
+- Per-channel conversation memory (each channel has its own session)
+- Supports long responses with automatic message splitting
+- Configure in Settings → Discord Bot section
 
 ### Enhanced Agent Loop Display
 OutObot shows detailed internal events during agent execution:
