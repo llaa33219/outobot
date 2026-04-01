@@ -1,5 +1,84 @@
 # OutObot Changelog
 
+## 2026-04-01 - Discord Bot Integration & Frontend Improvements
+
+### Summary
+
+Added Discord bot integration allowing OutObot to respond to messages in Discord channels. Frontend improvements including GLM Coding Plan UI, better WebSocket reconnect, and finish event filtering.
+
+### Changes
+
+**New File: `outo/server/discord_bot.py`**
+- `OutobotDiscord` class: Full Discord bot integration using discord.py
+- Responds to @mentions in guild channels and DMs
+- Per-channel persistent sessions: `discord_{guild_id}_{channel_id}` for guilds, `discord_dm_{channel_id}` for DMs
+- Message splitting for Discord's 2000 character limit (`split_message()`)
+- Time context awareness (same as web sessions - detects gaps of 1+ minutes)
+- Hot-reload support: `reload()` method for token changes without restart
+- Helper functions: `load_discord_config()`, `strip_bot_mention()`, `build_session_id()`
+
+**`run.py` - Discord Bot Lifecycle:**
+- Imports `OutobotDiscord` and `load_discord_config`
+- Bot started in lifespan if config exists and is enabled
+- Bot gracefully closed on shutdown
+- Bot stored in `app.state.discord_bot`
+
+**`outo/server/routes/providers.py` - Discord API:**
+- `GET /api/discord`: Returns Discord config (token masked as "********")
+- `POST /api/discord`: Saves config, starts/stops/reloads bot as needed
+- Token update detection: only restarts bot if token actually changed
+- Type hint fix: `save_providers` parameter type annotation
+
+**`static/index.html` - Settings UI:**
+- Added GLM Coding Plan API key input field
+- Added Discord Bot settings section with token input and enable toggle
+
+**`static/script.js` - Frontend Improvements:**
+- Added GLM Coding Plan to `PROVIDER_KEYS` and provider dropdown
+- New `loadDiscordConfig()` method for loading Discord settings
+- New `restoreActiveExecution()` method: queries `/api/executions/active` on connect
+- Replaced `wasProcessing` flag with `restoreActiveExecution()` for reliable reconnect
+- Added `_sentAgent` tracking to identify the top-level agent in conversations
+- Discord config save/load in settings modal
+- Provider list now includes `glm_coding` in all relevant places
+
+**`static/js/events.js` - Finish Event Filtering:**
+- `handleFinish()` now only processes finish for the top-level (starting) agent
+- Sub-agent finish events are ignored (they were internal and shouldn't render in main bubble)
+
+**`static/js/ui.js` - Rendering Fix:**
+- `renderAgentMessage()` now uses `activityIndicator` and `finishContent` elements
+- Updated from deprecated `thinking`/`textSegment` references
+
+**`install.sh` - Dependency:**
+- Added `discord.py` to pip install commands (both fresh install and upgrade)
+
+### Architecture
+
+```
+Discord Message Flow:
+  User @mentions bot → discord.py on_message → strip_bot_mention()
+  → _process_message() → load_session() → async_run_stream()
+  → split_message() → message.reply() + channel.send() for chunks
+  → save_session()
+
+Session ID Mapping:
+  Guild channel: discord_{guild_id}_{channel_id}
+  DM channel:    discord_dm_{channel_id}
+
+Bot Lifecycle:
+  run.py lifespan → load_discord_config() → OutobotDiscord.start()
+  Settings save → POST /api/discord → reload() or start()/close()
+```
+
+### Dependencies Added
+
+| Package | Purpose |
+|---------|---------|
+| discord.py | Discord bot integration |
+
+---
+
 ## 2026-03-29 - SSE ExecutionManager Unification & Execution Recovery
 
 ### Summary
