@@ -277,6 +277,24 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                 except (ValueError, TypeError, AttributeError):
                     pass
 
+        try:
+            from outo.agents import build_note_context_message
+
+            note_msg = build_note_context_message()
+            if note_msg:
+                history = list(history) if history else []
+                history.insert(
+                    0,
+                    Message(
+                        type="system",
+                        sender="system",
+                        receiver=request.agent,
+                        content=note_msg,
+                    ),
+                )
+        except Exception:
+            pass
+
         # Track pending delegations for caller→target mapping
         pending_delegations = {}
         output = None

@@ -18,7 +18,8 @@
       "enabled": true,
       "file": "agent-browser/SKILL.md",
       "sources": [
-        "agents"
+        "agents",
+        "claude-code"
       ]
     },
     {

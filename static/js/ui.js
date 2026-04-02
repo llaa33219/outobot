@@ -306,8 +306,8 @@ class UIRenderer {
   // Render flat mode agent message
   renderAgentMessage(content, agentName, container) {
     const bubble = this.createAgentBubbleElement(agentName);
-    bubble.thinking.remove();
-    bubble.textSegment.innerHTML = this.renderMarkdown(content);
+    bubble.activityIndicator.remove();
+    bubble.finishContent.innerHTML = this.renderMarkdown(content);
     (container || this.chat.els.chatArea).appendChild(bubble.element);
     this.chat.scrollToBottom(true);
     return bubble.element;

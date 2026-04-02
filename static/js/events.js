@@ -137,6 +137,12 @@ class EventHandlers {
   }
 
   handleFinish(agent, cid, data) {
+    // Only process finish for the top-level (starting) agent.
+    // Sub-agent finish events are internal and should not render in the main bubble.
+    if (agent !== this.chat._sentAgent) {
+      return;
+    }
+
     if (this.chat.subAgentCards[cid]) {
       delete this.chat.subAgentCards[cid];
     }

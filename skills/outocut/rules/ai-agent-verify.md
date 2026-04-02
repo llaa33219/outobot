@@ -208,10 +208,20 @@ How to check:
   - Is the element's visual center at that point? (for centered elements)
   - Is the element in the correct quadrant/corner?
   - Are multiple elements correctly spaced relative to each other?
+
+⚠️ AI AGENT COORDINATE WARNING:
+  - (0, 0) is ALWAYS TOP-LEFT, NOT center
+  - Center of 1920×1080 is [960, 540]
+  - Bottom-left is [0, 1080], NOT [0, 0]
+  - NEVER use [0, 0] for "center" positioning
+
 Typical failures:
   - Element appears at top-left when it should be centered (position: [0,0] instead of [960,540])
   - Element off-screen (position outside canvas bounds)
   - Elements overlapping when they should be separate
+  - Agent assumes (0,0) means center → element ends up at top-left instead
+  - Agent assumes layer anchor is "center by default" → rotation/scale pivots wrong
+    * FIX: Always explicitly set anchor: [width/2, height/2] for center pivot
 ```
 
 **Scale and Size**:
@@ -555,6 +565,13 @@ PROTOCOL:
 ---
 
 ## Quick Reference
+
+> ⚠️ **CRITICAL: AI AGENT COORDINATE WARNING**
+>
+> **OutOcut uses TOP-LEFT origin (0, 0)**
+> - Center of 1920×1080 = [960, 540], NOT [0, 0]
+> - Bottom-left = [0, height], NOT [0, 0]
+> - **When checking positions, ask yourself: "Is this position relative to top-left?"**
 
 ### Frame Extraction One-Liner
 

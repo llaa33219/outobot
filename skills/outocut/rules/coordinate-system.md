@@ -10,11 +10,20 @@ Comprehensive reference for OutOcut's coordinate system, spatial conventions, an
 
 ## Overview
 
+> ⚠️ **AI AGENT COORDINATE WARNING**
+>
+> **CRITICAL**: Many AI agents incorrectly assume `(0, 0)` is at the **center** of the canvas or at the **bottom-left**.
+>
+> **OUTOCUT CONVENTION**: `(0, 0)` is ALWAYS at the **TOP-LEFT** corner.
+> - Center of a 1920×1080 canvas is `[960, 540]`, NOT `[0, 0]`
+> - Bottom-left is `[0, height]`, NOT `[0, 0]`
+> - When positioning elements, `(0, 0)` means top-left, not center
+
 OutOcut uses a **standard 2D graphics coordinate system** where:
 
 | Property | Value | Description |
 |----------|-------|-------------|
-| **Origin** | `(0, 0)` | Top-left corner of the canvas |
+| **Origin** | `(0, 0)` | **TOP-LEFT** corner of the canvas |
 | **X-axis** | Positive → Right | Horizontal position increases rightward |
 | **Y-axis** | Positive ↓ Down | Vertical position increases downward |
 | **Angle** | Positive ↻ Clockwise | Rotation values increase clockwise |
@@ -51,6 +60,15 @@ The outermost space representing the entire render canvas.
 ### 2. Layer Space
 
 The coordinate system local to each layer, used for transforms and content placement within the layer.
+
+> ⚠️ **AI AGENT WARNING: Layer Space Origin is TOP-LEFT, not Center**
+>
+> **CRITICAL**: Many AI agents incorrectly assume `(0, 0)` in layer space is at the **layer's center**.
+>
+> **OUTOCUT CONVENTION**: Layer space `(0, 0)` is at the **TOP-LEFT** of the layer content.
+> - `anchor: [0, 0]` = top-left corner of layer
+> - `anchor: [width/2, height/2]` = **center** of layer
+> - The `anchor` value DEFINE where (0,0) is, NOT that (0,0) is the center
 
 - **Origin**: Defined by the layer's `anchor` value
 - **Bounds**: Depends on layer content size
@@ -166,6 +184,18 @@ For a 400×200 layer, center anchor = [200, 100]
 ## Transform Coordinate System
 
 Transforms operate in layer space, with `anchor` defining the origin.
+
+> ⚠️ **AI AGENT WARNING: Do NOT Confuse Layer Space (0,0) with Layer Center**
+>
+> **WRONG assumption**: "`(0, 0)` in layer coordinates means the layer's center"
+>
+> **CORRECT understanding**:
+> - Layer space `(0, 0)` is at the **TOP-LEFT** of the layer content
+> - `anchor` is a **user-defined point** that becomes the origin of layer space
+> - `anchor: [0, 0]` → origin is top-left
+> - `anchor: [200, 100]` → origin is at position (200, 100) within the layer
+>
+> **When centering a layer**: You set `anchor: [width/2, height/2]` AND set `position` to composition center
 
 ### Anchor (`anchor`)
 

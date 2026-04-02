@@ -207,6 +207,29 @@ class ExecutionManager:
             pass
 
         try:
+            from outo.agents import build_note_context_message
+
+            note_msg = build_note_context_message()
+            if note_msg:
+                if history_to_use is None:
+                    history_to_use = []
+                elif isinstance(history_to_use, list):
+                    history_to_use = list(history_to_use)
+                else:
+                    history_to_use = []
+                history_to_use.insert(
+                    0,
+                    Message(
+                        type="system",
+                        sender="system",
+                        receiver=execution.agent_name,
+                        content=note_msg,
+                    ),
+                )
+        except Exception:
+            pass
+
+        try:
             async for event in async_run_stream(
                 entry=agent,
                 message=message,

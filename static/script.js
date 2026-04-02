@@ -9,6 +9,7 @@ const PROVIDER_KEYS = [
   { name: 'google', inputId: 'googleKeyInput', statusId: 'googleStatus', key: 'google' },
   { name: 'minimax', inputId: 'minimaxKeyInput', statusId: 'minimaxStatus', key: 'minimax' },
   { name: 'glm', inputId: 'glmKeyInput', statusId: 'glmStatus', key: 'glm' },
+  { name: 'glm_coding', inputId: 'glmCodingKeyInput', statusId: 'glmCodingStatus', key: 'glm_coding' },
   { name: 'kimi', inputId: 'kimiKeyInput', statusId: 'kimiStatus', key: 'kimi' },
 ];
 
@@ -57,31 +58,23 @@ class OutObotChat {
 
     this.pendingAttachments = [];
     this.providerConfig = {};
+    this.discordConfig = {};
     this.agentConfig = AGENT_DEFAULTS;
     this.currentAgent = 'outo';
     this.currentSession = null;
     this.sessions = [];
     this.processing = false;
-    this.wasProcessing = false;
-    this.userScrolledUp = false;
-    this.messageContainer = null;
-    
-    this.ws = null;
-    this.reconnectDelay = 1000;
-    this.maxReconnectDelay = 10000;
-    this.reconnecting = false;
-    this.currentBubble = null;
-    this.currentFinishEl = null;
-    this.activityIndicator = null;
+    this._sentAgent = null;
+
     this.activeAgents = new Set();
     this.involvedAgents = new Set();
-    this.agentTokens = {};
+    this.pendingAgentCalls = new Set();
     this.subAgentCards = {};
     this.callStack = [];
+    this.agentTokens = {};
+    this.pendingTokens = {};
     this.agentStartTimes = {};
     this.agentMeta = AGENT_DEFAULTS;
-    this.pendingTokens = {};
-    this.pendingAgentCalls = new Set();
 
     if (window.innerWidth <= 960) {
       this.els.sidebar.classList.add('collapsed');
@@ -210,7 +203,8 @@ class OutObotChat {
         this.loadProviders(),
         this.loadAgents(),
         this.sessionManager.loadSessions(),
-        this.loadSkills()
+        this.loadSkills(),
+        this.loadDiscordConfig()
       ]);
       
       this.buildAgentBar();
@@ -219,9 +213,34 @@ class OutObotChat {
       this.checkWelcomeSetup();
       this.updateProviderStatuses();
       this.connectWebSocket();
+      this.restoreActiveExecution();
     } catch (error) {
       console.error('Init error:', error);
       this.updateConnectionStatus('disconnected');
+    }
+  }
+
+  async restoreActiveExecution() {
+    try {
+      const res = await fetch('/api/executions/active');
+      const executions = await res.json();
+      if (!executions || executions.length === 0) return;
+
+      const active = executions[0];
+      if (active.status !== 'running') return;
+
+      this.currentSession = active.session_id;
+      this.hideWelcome();
+      this.setProcessing(true);
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({
+          type: 'reconnect',
+          session_id: active.session_id
+        }));
+        this.logActivity('Restored active session');
+      }
+    } catch (err) {
+      console.error('Failed to restore execution:', err);
     }
   }
 
@@ -235,20 +254,11 @@ class OutObotChat {
       this.reconnectDelay = 1000;
       this.reconnecting = false;
       this.logActivity('Connected to server');
-      if (this.wasProcessing && this.currentSession) {
-        this.ws.send(JSON.stringify({
-          type: 'reconnect',
-          session_id: this.currentSession
-        }));
-        this.wasProcessing = false;
-      }
+      this.restoreActiveExecution();
     };
 
     this.ws.onclose = () => {
       this.updateConnectionStatus('disconnected');
-      if (this.processing) {
-        this.wasProcessing = true;
-      }
       this.reconnecting = true;
       setTimeout(() => {
         this.reconnectDelay = Math.min(this.reconnectDelay * 1.5, this.maxReconnectDelay);
@@ -312,6 +322,15 @@ class OutObotChat {
     }
   }
 
+  async loadDiscordConfig() {
+    try {
+      const res = await fetch('/api/discord');
+      this.discordConfig = await res.json();
+    } catch (err) {
+      console.error('Failed to load Discord config:', err);
+    }
+  }
+
   async loadAgents() {
     try {
       const res = await fetch('/api/agents');
@@ -322,6 +341,7 @@ class OutObotChat {
           merged[key] = { ...AGENT_DEFAULTS[key], ...(data.agents[key] || {}) };
         });
         this.agentConfig = merged;
+        this.agentMeta = merged;
       }
     } catch (err) {
       console.error('Failed to load agents:', err);
@@ -372,7 +392,7 @@ class OutObotChat {
     const sel = this.els.defaultProviderSelect;
     sel.innerHTML = '';
     
-    const providers = ['openai', 'anthropic', 'google', 'minimax', 'glm', 'kimi'];
+    const providers = ['openai', 'anthropic', 'google', 'minimax', 'glm', 'glm_coding', 'kimi'];
     const availableProviders = [];
     
     providers.forEach(key => {
@@ -396,6 +416,7 @@ class OutObotChat {
       google: 'Google',
       minimax: 'MiniMax',
       glm: 'GLM',
+      glm_coding: 'GLM Coding Plan',
       kimi: 'Kimi'
     };
     
@@ -460,7 +481,7 @@ class OutObotChat {
   checkWelcomeSetup() {
     if (!this.els.welcomeSetup) return;
     
-    const providerKeys = ['openai', 'anthropic', 'google', 'minimax', 'glm', 'kimi'];
+    const providerKeys = ['openai', 'anthropic', 'google', 'minimax', 'glm', 'glm_coding', 'kimi'];
     const configured = providerKeys.filter(key => {
       const val = this.providerConfig[key];
       return val && (val.api_key || val.enabled);
@@ -647,7 +668,7 @@ class OutObotChat {
     this.els.messageInput.value = '';
     this.autoResizeTextarea();
     this.setProcessing(true);
-    this.wasProcessing = false;
+    this._sentAgent = this.currentAgent;
     this.activeAgents.clear();
     this.involvedAgents.clear();
     this.currentBubble = null;
@@ -879,6 +900,26 @@ class OutObotChat {
     if (defaultModel && this.els.defaultModelSelect) {
       this.els.defaultModelSelect.value = defaultModel;
     }
+
+    const discordToken = this.discordConfig.token;
+    const discordTokenInput = document.getElementById('discordTokenInput');
+    if (discordTokenInput) {
+      discordTokenInput.value = discordToken || '';
+    }
+    const discordEnabled = document.getElementById('discordEnabled');
+    if (discordEnabled) {
+      discordEnabled.value = String(this.discordConfig.enabled || false);
+    }
+    const discordStatus = document.getElementById('discordStatus');
+    if (discordStatus) {
+      if (this.discordConfig.enabled && this.discordConfig.token) {
+        discordStatus.textContent = '✓';
+        discordStatus.className = 'key-status active';
+      } else {
+        discordStatus.textContent = '';
+        discordStatus.className = 'key-status';
+      }
+    }
   }
 
   closeSettings() {
@@ -925,7 +966,7 @@ class OutObotChat {
   }
 
   async saveSettings() {
-    const providerKeys = ['openai', 'anthropic', 'google', 'minimax', 'glm', 'kimi'];
+    const providerKeys = ['openai', 'anthropic', 'google', 'minimax', 'glm', 'glm_coding', 'kimi'];
     
     const newConfig = { ...this.providerConfig };
     
@@ -964,6 +1005,23 @@ class OutObotChat {
       }
     } catch (err) {
       this.showSaveFeedback('Error: ' + err.message, true);
+    }
+
+    const discordToken = document.getElementById('discordTokenInput')?.value?.trim() || '';
+    const discordEnabled = document.getElementById('discordEnabled')?.value === 'true';
+
+    try {
+      await fetch('/api/discord', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: discordEnabled,
+          token: discordToken
+        })
+      });
+      await this.loadDiscordConfig();
+    } catch (err) {
+      console.error('Failed to save Discord config:', err);
     }
   }
 

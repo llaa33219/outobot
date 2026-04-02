@@ -218,6 +218,15 @@ Session load/save plus execution state persistence functions:
 
 ## Recent Changes
 
+### Note System & Dynamic Skills (2026-04-02)
+- Added persistent Note System at `~/.outobot/note/` with `me.md` and `important.md`
+- Note context auto-attached to every agent message as a system message
+- `build_note_context_message()` reads notes from disk on every request (always fresh)
+- `is_me_empty()` triggers first-time setup hint when `me.md` is empty
+- Skills list now dynamically generated from installed skills (`_build_skills_list()`)
+- Note context injected in `outo/server/execution.py` and `outo/server/routes/chat.py`
+- Agents instructed to proactively write notes and ask user preferences on first run
+
 ### Discord Bot Integration (2026-04-01)
 - Added `outo/server/discord_bot.py` with `OutobotDiscord` class
 - Discord bot responds to @mentions in guild channels and DMs

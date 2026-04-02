@@ -32,6 +32,7 @@ from outo import (
     AgentManager,
 )
 from outo.server.execution import ExecutionManager  # pyright: ignore[reportMissingImports]
+from outo.server.discord_bot import OutobotDiscord, load_discord_config  # pyright: ignore[reportMissingImports]
 
 get_skills_manager = import_module("outo.skills").get_skills_manager
 
@@ -129,7 +130,27 @@ async def lifespan(app: FastAPI):
     )
     app.state.agent_manager = agent_manager
     _start_skills_sync_thread(app)
+
+    discord_bot = None
+    discord_config = load_discord_config(CONFIG_DIR)
+    if discord_config:
+        try:
+            discord_bot = OutobotDiscord(
+                token=discord_config["token"],
+                agent_manager=agent_manager,
+                provider_manager=provider_manager,
+                sessions_dir=SESSIONS_DIR,
+            )
+            await discord_bot.start()
+        except Exception as e:
+            print(f"Failed to start Discord bot: {e}")
+            discord_bot = None
+    app.state.discord_bot = discord_bot
+
     yield
+
+    if discord_bot:
+        await discord_bot.close()
 
     app.state.skills_sync_shutdown.set()
     stop_periodic_sync = getattr(app.state.skills_manager, "stop_periodic_sync", None)

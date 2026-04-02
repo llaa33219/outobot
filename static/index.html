@@ -237,6 +237,23 @@
 
             <div class="api-key-field">
               <div class="api-key-header">
+                <label>GLM Coding Plan</label>
+                <span class="key-status" id="glmCodingStatus"></span>
+              </div>
+              <div class="key-input-row">
+                <input type="password" id="glmCodingKeyInput" placeholder="API key" autocomplete="off" spellcheck="false">
+                <button class="btn-icon key-toggle" data-target="glmCodingKeyInput" title="Show/Hide">
+                  <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  <svg class="eye-closed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                </button>
+                <button class="btn-icon key-clear" data-target="glmCodingKeyInput" title="Clear">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="api-key-field">
+              <div class="api-key-header">
                 <label>Kimi (Moonshot AI)</label>
                 <span class="key-status" id="kimiStatus"></span>
               </div>
@@ -263,6 +280,36 @@
             <div class="modal-row">
               <label for="defaultModelSelect">Model</label>
               <select id="defaultModelSelect"></select>
+            </div>
+          </section>
+
+          <section class="modal-section">
+            <h3>🤖 Discord Bot</h3>
+            <p class="section-desc">Configure the Discord bot integration. The bot responds when mentioned in Discord channels.</p>
+
+            <div class="api-key-field">
+              <div class="api-key-header">
+                <label>Discord Bot Token</label>
+                <span class="key-status" id="discordStatus"></span>
+              </div>
+              <div class="key-input-row">
+                <input type="password" id="discordTokenInput" placeholder="Bot token from Discord Developer Portal" autocomplete="off" spellcheck="false">
+                <button class="btn-icon key-toggle" data-target="discordTokenInput" title="Show/Hide">
+                  <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  <svg class="eye-closed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                </button>
+                <button class="btn-icon key-clear" data-target="discordTokenInput" title="Clear">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="modal-row">
+              <label for="discordEnabled">Enable</label>
+              <select id="discordEnabled">
+                <option value="false">Disabled</option>
+                <option value="true">Enabled</option>
+              </select>
             </div>
           </section>
         </div>

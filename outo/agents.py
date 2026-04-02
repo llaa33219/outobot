@@ -3,8 +3,73 @@ OutObot Agent Definitions
 Supports MiniMax, GLM, GLM Coding Plan, Kimi (Moonshot AI)
 """
 
+from pathlib import Path
 from typing import Annotated
 from agentouto import Agent, Tool
+
+
+NOTE_DIR = Path.home() / ".outobot" / "note"
+
+
+def _load_note_file(filename: str) -> str | None:
+    filepath = NOTE_DIR / filename
+    if not filepath.exists():
+        return None
+    content = filepath.read_text(encoding="utf-8").strip()
+    if not content:
+        return None
+    substantive_lines = [
+        line
+        for line in content.splitlines()
+        if line.strip()
+        and not line.strip().startswith(">")
+        and not line.strip().startswith("<!--")
+        and not line.strip().startswith("#")
+    ]
+    if not substantive_lines:
+        return None
+    return content
+
+
+def build_note_context_message() -> str:
+    parts = []
+
+    me_content = _load_note_file("me.md")
+    if me_content:
+        parts.append(
+            "[me.md — 에이전트 정체성 — ⚠️ MANDATORY: 아래 내용을 반드시 따르세요. "
+            "말투, 성격, 톤 등 me.md에 기록된 모든 사항은 절대 규칙입니다. "
+            "이를 위반하는 응답은 금지됩니다.]\n" + me_content
+        )
+
+    important_content = _load_note_file("important.md")
+    if important_content:
+        parts.append(f"[important.md — 사용자 중요 사실]\n{important_content}")
+
+    if not parts:
+        return ""
+
+    note_files = [
+        f.name
+        for f in NOTE_DIR.glob("*.md")
+        if f.name not in ("me.md", "important.md", "README.md")
+    ]
+    catalog = ""
+    if note_files:
+        catalog = (
+            "\n\n[기타 note 파일 — 필요시 읽기: cat ~/.outobot/note/<filename>]\n"
+            + "\n".join(f"- {n}" for n in sorted(note_files))
+        )
+
+    return (
+        "[Note Context — 매 메시지마다 최신 상태로 로딩됨]\n"
+        + "\n\n".join(parts)
+        + catalog
+    )
+
+
+def is_me_empty() -> bool:
+    return _load_note_file("me.md") is None
 
 
 class AgentManager:
@@ -16,7 +81,6 @@ class AgentManager:
 
     def _get_model(self, provider: str, default: str) -> str:
         model = self.model_config.get(provider, {}).get("model", default)
-        # Return default if model is empty string
         if not model:
             return default
         return model
@@ -33,6 +97,36 @@ class AgentManager:
             "kimi_code": "kimi-k2.5",
         }
         return defaults.get(provider, "gpt-5.2")
+
+    @staticmethod
+    def _build_skills_list() -> str:
+        skills_dir = Path.home() / ".outobot" / "skills"
+        if not skills_dir.exists():
+            return "- (no skills installed)"
+        lines = []
+        for skill_dir in sorted(skills_dir.iterdir()):
+            if not skill_dir.is_dir():
+                continue
+            skill_md = skill_dir / "SKILL.md"
+            if not skill_md.exists():
+                continue
+            desc = skill_dir.name
+            try:
+                text = skill_md.read_text(encoding="utf-8")
+                for line in text.splitlines():
+                    if line.startswith("description:"):
+                        desc = line.split(":", 1)[1].strip()
+                        break
+                else:
+                    for line in text.splitlines():
+                        stripped = line.lstrip("# ").strip()
+                        if stripped and not line.strip().startswith("---"):
+                            desc = stripped
+                            break
+            except OSError:
+                pass
+            lines.append(f"- {skill_dir.name}: {desc}")
+        return "\n".join(lines) if lines else "- (no skills installed)"
 
     def _build_agents(self):
         self.agents = {}
@@ -61,7 +155,14 @@ class AgentManager:
             first_provider_name, self._get_default_model(first_provider_name)
         )
 
-        skill_info = """
+        skills_list = self._build_skills_list()
+        me_empty_hint = (
+            "\n**⚠️ FIRST-TIME SETUP:** `me.md` is empty. At the start of this conversation, ask the user about their preferences — speech style (존댓말/반말, formal/casual), preferred response length, language. Then write your findings to `me.md`."
+            if is_me_empty()
+            else ""
+        )
+
+        skill_info = f"""
 ## Available Skills
 
 You have these skills available. To use a skill:
@@ -70,15 +171,33 @@ You have these skills available. To use a skill:
 3. Apply the skill instructions to complete the task
 
 **Available Skills:**
-- agent-browser: Browser automation CLI for AI agents (web interaction, form filling, scraping)
-- blender: Blender interface, workflows, and 3D production pipeline
-- find-skills: Helps discover and install new agent skills
-- outocut: OutOcut video editor - CLI commands, JSON project format, animation system
-- remotion: Best practices for Remotion - Video creation in React
+{skills_list}
 
 Skills are stored in ~/.outobot/skills/ directory. Each skill has a SKILL.md file with full documentation.
 
-When useful, write notes to ~/.outobot/note/ for future reference. Check existing notes there to recall context from previous sessions."""
+## Note System (~/.outobot/note/)
+
+You have a personal knowledge base for recording and recalling information across sessions.
+
+**Core Files (auto-attached every message — always up to date):**
+- `me.md` — Your agent identity: speech style, tone, personality traits. Write what you learn about yourself through user interactions.
+- `important.md` — Important facts about the user: preferences, tastes, workflow, projects, language preference. Record anything worth remembering.
+
+**Categorized Note Files (read on demand):**
+- Create topic-specific `.md` files for any information worth remembering: `project-alpha.md`, `api-patterns.md`, `architecture-decisions.md`, `learning-log.md`, `bug-history.md`, etc.
+- Discover available notes: `run_bash: ls ~/.outobot/note/`
+- Read a specific note: `run_bash: cat ~/.outobot/note/<filename>`
+- Organize freely — use directories if needed (e.g., `~/.outobot/note/projects/alpha.md`)
+
+**Rules:**
+1. Write to note files WITHOUT being asked — proactively record useful information
+2. When you learn something about the user → immediately update `important.md`
+3. When the user comments on your style or you adapt → update `me.md`
+4. When you research a topic, solve a problem, or make a decision → create/update a categorized note file
+5. Use `run_bash` to read/write files (cat / heredoc)
+6. Keep notes concise and scannable — bullet points and headers
+7. DO NOT record sensitive data (passwords, API keys, personal secrets)
+{me_empty_hint}"""
 
         self.agents["outo"] = Agent(
             name="outo",

@@ -21,6 +21,54 @@ OutObot uses a multi-agent architecture where specialized agents collaborate to 
 | **Creativus** | Creative | Creative problem solving and ideation |
 | **Artifex** | Artistic | Artistic and design work |
 
+## Note System
+
+OutObot agents have a persistent knowledge base at `~/.outobot/note/` for recording and recalling information across sessions.
+
+### Note Functions (module-level in `outo/agents.py`)
+
+#### `_load_note_file(filename)`
+
+Loads and validates a note file from `~/.outobot/note/`. Returns `None` if file doesn't exist, is empty, or contains only non-substantive content (headers, HTML comments, blockquotes).
+
+```python
+def _load_note_file(filename: str) -> str | None
+```
+
+#### `build_note_context_message()`
+
+Builds a system message containing `me.md` (agent identity) and `important.md` (user facts), plus a catalog of other note files. Returns empty string if neither file exists.
+
+```python
+def build_note_context_message() -> str
+```
+
+This message is automatically prepended to agent history as a system message in all chat endpoints (SSE, WebSocket, non-streaming). It is re-read from disk on every request so agents always have the latest note state.
+
+#### `is_me_empty()`
+
+Returns `True` if `me.md` doesn't exist or contains no substantive content. Used to trigger a first-time setup hint in agent instructions.
+
+```python
+def is_me_empty() -> bool
+```
+
+### Note Files
+
+| File | Auto-attached | Purpose |
+|------|--------------|---------|
+| `me.md` | Yes (every message) | Agent identity: speech style, tone, personality traits |
+| `important.md` | Yes (every message) | Important facts about the user: preferences, workflow, projects |
+| Other `.md` files | Catalog only (read on demand) | Topic-specific notes (e.g., `project-alpha.md`, `api-patterns.md`) |
+
+### Note Context Injection
+
+When a chat request is processed:
+1. `build_note_context_message()` reads `me.md` and `important.md` from disk
+2. A system message is prepended to the agent's history at position 0
+3. A catalog of other note files is included for on-demand reading
+4. Applied in `outo/server/execution.py` (WebSocket/SSE) and `outo/server/routes/chat.py` (all endpoints)
+
 ## AgentManager Class
 
 The `AgentManager` class in `outo/agents.py` manages all agent instances:
@@ -61,6 +109,15 @@ Returns all agent instances as dictionary.
 ```python
 def get_all_agents(self) -> dict:
     return self.agents
+```
+
+#### `_build_skills_list()` (static)
+
+Dynamically scans `~/.outobot/skills/` and returns a formatted skills list string. Reads the description from each skill's `SKILL.md` file.
+
+```python
+@staticmethod
+def _build_skills_list() -> str
 ```
 
 ## Provider Priority
@@ -120,9 +177,47 @@ Each agent has a specific temperature setting that controls randomness in output
 
 ## Agent Instructions
 
-Each agent has specific instructions embedded:
+Each agent has specific instructions embedded in `outo/agents.py`. The instructions now include:
 
-### OutObot (Coordinator)
+### Dynamic Skills List
+
+Skills are dynamically generated from `~/.outobot/skills/` at agent creation time using `_build_skills_list()`. Each installed skill's name and description (from its `SKILL.md`) is listed in the agent instructions.
+
+### Note System in Instructions
+
+All agents include Note System documentation in their instructions:
+
+```
+## Note System (~/.outobot/note/)
+
+Core Files (auto-attached every message — always up to date):
+- me.md — Your agent identity: speech style, tone, personality traits
+- important.md — Important facts about the user
+
+Categorized Note Files (read on demand):
+- Create topic-specific .md files for information worth remembering
+- Discover available notes: run_bash: ls ~/.outobot/note/
+- Read a specific note: run_bash: cat ~/.outobot/note/<filename>
+
+Rules:
+1. Write to note files WITHOUT being asked — proactively record useful information
+2. When you learn something about the user → immediately update important.md
+3. When the user comments on your style → update me.md
+4. When you research a topic, solve a problem → create/update a categorized note file
+5. Use run_bash to read/write files
+6. Keep notes concise and scannable — bullet points and headers
+7. DO NOT record sensitive data (passwords, API keys, personal secrets)
+```
+
+### First-Time Setup Hint
+
+When `me.md` is empty (detected by `is_me_empty()`), the OutObot coordinator agent gets an additional hint:
+
+```
+**⚠️ FIRST-TIME SETUP:** me.md is empty. At the start of this conversation, ask the user about their preferences — speech style (존댓말/반말, formal/casual), preferred response length, language. Then write your findings to me.md.
+```
+
+### OutObot (Coordinator) — Full Instructions
 
 ```
 You are the main coordinator agent. Your role is to:
@@ -130,16 +225,11 @@ You are the main coordinator agent. Your role is to:
 - Manage workflow and ensure quality output
 
 ## Available Skills
+{dynamically generated list from _build_skills_list()}
 
-When you need to use a skill:
-1. First, read the skill documentation by using the Read tool to read the SKILL.md file in the skill folder
-2. The skill folder is located in: ~/.outobot/skills/<skill-name>/SKILL.md
-3. Understand the skill's purpose, when to use it, and how to use it
-4. Apply the skill instructions to complete the task
-
-Skills are stored in ~/.outobot/skills/ directory. Each skill has a SKILL.md file with full documentation.
-
-When useful, write notes to ~/.outobot/note/ for future reference. Check existing notes there to recall context from previous sessions.
+## Note System (~/.outobot/note/)
+{note system instructions as above}
+{first-time setup hint if me.md is empty}
 
 You can delegate to these specialized agents:
 - peritus: General professional work
@@ -151,131 +241,9 @@ You can delegate to these specialized agents:
 - artifex: Artistic and design work
 ```
 
-### Peritus (Professional)
+### Other Agents
 
-```
-You are a general professional work agent. Handle diverse tasks with expertise and professionalism.
-
-## Available Skills
-
-When you need to use a skill:
-1. First, read the skill documentation by using the Read tool to read the SKILL.md file in the skill folder
-2. The skill folder is located in: ~/.outobot/skills/<skill-name>/SKILL.md
-3. Understand the skill's purpose, when to use it, and how to use it
-4. Apply the skill instructions to complete the task
-
-Skills are stored in ~/.outobot/skills/ directory. Each skill has a SKILL.md file with full documentation.
-
-When useful, write notes to ~/.outobot/note/ for future reference. Check existing notes there to recall context from previous sessions.
-```
-
-### Inquisitor (Research)
-
-```
-You are a research and investigation specialist. Find information, analyze data, and provide detailed research.
-
-## Available Skills
-
-When you need to use a skill:
-1. First, read the skill documentation by using the Read tool to read the SKILL.md file in the skill folder
-2. The skill folder is located in: ~/.outobot/skills/<skill-name>/SKILL.md
-3. Understand the skill's purpose, when to use it, and how to use it
-4. Apply the skill instructions to complete the task
-
-Skills are stored in ~/.outobot/skills/ directory. Each skill has a SKILL.md file with full documentation.
-
-When useful, write notes to ~/.outobot/note/ for future reference. Check existing notes there to recall context from previous sessions.
-```
-
-### Rimor (Explorer)
-
-```
-You are a precise and fast exploration agent. Find information quickly and accurately.
-
-## Available Skills
-
-When you need to use a skill:
-1. First, read the skill documentation by using the Read tool to read the SKILL.md file in the skill folder
-2. The skill folder is located in: ~/.outobot/skills/<skill-name>/SKILL.md
-3. Understand the skill's purpose, when to use it, and how to use it
-4. Apply the skill instructions to complete the task
-
-Skills are stored in ~/.outobot/skills/ directory. Each skill has a SKILL.md file with full documentation.
-
-When useful, write notes to ~/.outobot/note/ for future reference. Check existing notes there to recall context from previous sessions.
-```
-
-### Recensor (Review)
-
-```
-You are a review and verification specialist. Review work, verify facts, and ensure quality.
-
-## Available Skills
-
-When you need to use a skill:
-1. First, read the skill documentation by using the Read tool to read the SKILL.md file in the skill folder
-2. The skill folder is located in: ~/.outobot/skills/<skill-name>/SKILL.md
-3. Understand the skill's purpose, when to use it, and how to use it
-4. Apply the skill instructions to complete the task
-
-Skills are stored in ~/.outobot/skills/ directory. Each skill has a SKILL.md file with full documentation.
-
-When useful, write notes to ~/.outobot/note/ for future reference. Check existing notes there to recall context from previous sessions.
-```
-
-### Cogitator (Thinking)
-
-```
-You are a deep thinking specialist. Analyze complex topics thoroughly and provide in-depth analysis.
-
-## Available Skills
-
-When you need to use a skill:
-1. First, read the skill documentation by using the Read tool to read the SKILL.md file in the skill folder
-2. The skill folder is located in: ~/.outobot/skills/<skill-name>/SKILL.md
-3. Understand the skill's purpose, when to use it, and how to use it
-4. Apply the skill instructions to complete the task
-
-Skills are stored in ~/.outobot/skills/ directory. Each skill has a SKILL.md file with full documentation.
-
-When useful, write notes to ~/.outobot/note/ for future reference. Check existing notes there to recall context from previous sessions.
-```
-
-### Creativus (Creative)
-
-```
-You are a creative problem solving agent. Generate innovative ideas and creative solutions.
-
-## Available Skills
-
-When you need to use a skill:
-1. First, read the skill documentation by using the Read tool to read the SKILL.md file in the skill folder
-2. The skill folder is located in: ~/.outobot/skills/<skill-name>/SKILL.md
-3. Understand the skill's purpose, when to use it, and how to use it
-4. Apply the skill instructions to complete the task
-
-Skills are stored in ~/.outobot/skills/ directory. Each skill has a SKILL.md file with full documentation.
-
-When useful, write notes to ~/.outobot/note/ for future reference. Check existing notes there to recall context from previous sessions.
-```
-
-### Artifex (Artistic)
-
-```
-You are an artistic and design specialist. Create visually appealing and artistic content.
-
-## Available Skills
-
-When you need to use a skill:
-1. First, read the skill documentation by using the Read tool to read the SKILL.md file in the skill folder
-2. The skill folder is located in: ~/.outobot/skills/<skill-name>/SKILL.md
-3. Understand the skill's purpose, when to use it, and how to use it
-4. Apply the skill instructions to complete the task
-
-Skills are stored in ~/.outobot/skills/ directory. Each skill has a SKILL.md file with full documentation.
-
-When useful, write notes to ~/.outobot/note/ for future reference. Check existing notes there to recall context from previous sessions.
-```
+All other agents (Peritus, Inquisitor, Rimor, Recensor, Cogitator, Creativus, Artifex) have the same skills list and note system instructions but without the delegation list.
 
 ## Agent Delegation
 
@@ -330,6 +298,7 @@ This error occurs when no AI provider is enabled or configured. Agents are only 
    - Google (Gemini models)
    - MiniMax (Chinese multilingual)
    - GLM (Chinese bilingual)
+   - GLM Coding Plan
    - Kimi (Moonshot AI)
 
 2. **Enter API Key**: After enabling a provider, enter a valid API key

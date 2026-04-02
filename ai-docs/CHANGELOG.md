@@ -1,5 +1,51 @@
 # OutObot Changelog
 
+## 2026-04-02 - Note System & Dynamic Skills List
+
+### Summary
+
+Added a persistent Note System (`~/.outobot/note/`) that auto-attaches identity and user context to every agent message. Skills list is now dynamically generated from installed skills instead of hardcoded. Note context is injected into agent history for all chat endpoints (SSE, WebSocket, non-streaming).
+
+### Changes
+
+**`outo/agents.py` - Note System & Dynamic Skills:**
+- New `_load_note_file(filename)`: Loads and validates note files from `~/.outobot/note/`, skipping empty/template-only files
+- New `build_note_context_message()`: Builds a system message with `me.md` (agent identity) and `important.md` (user facts), plus a catalog of other note files
+- New `is_me_empty()`: Checks if `me.md` is empty/unset, used to trigger first-time setup prompt
+- New `_build_skills_list()`: Dynamically reads installed skills from `~/.outobot/skills/` instead of hardcoded list
+- Agent instructions now include comprehensive Note System documentation with rules and categorized note file support
+- First-time setup hint: When `me.md` is empty, agents are instructed to ask user about preferences
+
+**`outo/server/execution.py` - Note Context Injection:**
+- Note context message is prepended to history as a system message before agent execution
+- Applied to WebSocket and SSE streaming via ExecutionManager
+
+**`outo/server/routes/chat.py` - Note Context Injection:**
+- Same note context injection for SSE streaming and non-streaming chat endpoints
+- Note context inserted at position 0 in history
+
+### Architecture
+
+```
+Note System Flow:
+  Agent request → build_note_context_message()
+    → reads me.md (agent identity) + important.md (user facts)
+    → builds catalog of other note files
+    → prepends system message to history
+  
+  First-time detection:
+    is_me_empty() → true → adds setup hint to skill_info
+    Agent asks user about preferences → writes to me.md
+
+Skills List Generation:
+  _build_skills_list()
+    → scans ~/.outobot/skills/ directories
+    → reads SKILL.md description from each
+    → returns formatted list for agent instructions
+```
+
+---
+
 ## 2026-04-01 - Discord Bot Integration & Frontend Improvements
 
 ### Summary
