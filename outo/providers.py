@@ -1,6 +1,6 @@
 """
 OutObot Provider Management
-Supports MiniMax, GLM, GLM Coding Plan, Kimi (Moonshot AI)
+Supports MiniMax, GLM, GLM Coding Plan, Kimi (Moonshot AI), Xiaomi MiMo
 """
 
 import os
@@ -119,6 +119,28 @@ class ProviderManager:
                     base_url="https://api.moonshot.ai/v1",
                 )
 
+        # Xiaomi MiMo (General)
+        if config.get("xiaomi", {}).get("enabled"):
+            api_key = config["xiaomi"].get("api_key", "")
+            if api_key:
+                self.providers["xiaomi"] = Provider(
+                    name="xiaomi",
+                    kind="openai",
+                    api_key=api_key,
+                    base_url="https://api.xiaomimimo.com/v1",
+                )
+
+        # Xiaomi MiMo Token Plan
+        if config.get("xiaomi_token_plan", {}).get("enabled"):
+            api_key = config["xiaomi_token_plan"].get("api_key", "")
+            if api_key:
+                self.providers["xiaomi_token_plan"] = Provider(
+                    name="xiaomi_token_plan",
+                    kind="anthropic",
+                    api_key=api_key,
+                    base_url="https://token-plan-sgp.xiaomimimo.com/anthropic",
+                )
+
     def save_config(self, config: dict):
         self.config_dir.mkdir(parents=True, exist_ok=True)
         with open(self.config_file, "w") as f:
@@ -143,6 +165,8 @@ class ProviderManager:
             "glm_coding": {"enabled": False, "api_key": "", "model": ""},
             "kimi": {"enabled": False, "api_key": "", "model": ""},
             "kimi_code": {"enabled": False, "api_key": "", "model": ""},
+            "xiaomi": {"enabled": False, "api_key": "", "model": ""},
+            "xiaomi_token_plan": {"enabled": False, "api_key": "", "model": ""},
         }
 
     def get_model_config(self) -> dict:
@@ -222,5 +246,19 @@ DEFAULT_PROVIDERS = {
         "models": ["kimi-k2.5", "kimi-k2.5-thinking", "kimi-k2"],
         "url": "https://platform.moonshot.ai",
         "base_url": "https://api.moonshot.ai/v1",
+    },
+    "xiaomi": {
+        "name": "Xiaomi MiMo",
+        "kind": "openai",
+        "models": ["mimo-v2-flash", "mimo-v2-pro", "mimo-v2-omni"],
+        "url": "https://platform.xiaomimimo.com",
+        "base_url": "https://api.xiaomimimo.com/v1",
+    },
+    "xiaomi_token_plan": {
+        "name": "Xiaomi MiMo Token Plan",
+        "kind": "anthropic",
+        "models": ["mimo-v2-flash", "mimo-v2-pro", "mimo-v2-omni"],
+        "url": "https://platform.xiaomimimo.com",
+        "base_url": "https://token-plan-sgp.xiaomimimo.com/anthropic",
     },
 }

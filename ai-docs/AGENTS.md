@@ -45,12 +45,12 @@ def build_note_context_message() -> str
 
 This message is automatically prepended to agent history as a system message in all chat endpoints (SSE, WebSocket, non-streaming). It is re-read from disk on every request so agents always have the latest note state.
 
-#### `is_me_empty()`
+#### `get_me_content()`
 
-Returns `True` if `me.md` doesn't exist or contains no substantive content. Used to trigger a first-time setup hint in agent instructions.
+Returns `me.md` content if it exists and has substantive text, `None` otherwise. Used to trigger a first-time setup hint in `build_note_extra_instructions()`.
 
 ```python
-def is_me_empty() -> bool
+def get_me_content() -> str | None
 ```
 
 ### Note Files
@@ -211,11 +211,14 @@ Rules:
 
 ### First-Time Setup Hint
 
-When `me.md` is empty (detected by `is_me_empty()`), the OutObot coordinator agent gets an additional hint:
+When `me.md` is empty (detected by `is_me_empty()`), `build_note_extra_instructions()` dynamically injects a first-time setup hint into the agent's extra instructions at message time:
 
 ```
-**⚠️ FIRST-TIME SETUP:** me.md is empty. At the start of this conversation, ask the user about their preferences — speech style (존댓말/반말, formal/casual), preferred response length, language. Then write your findings to me.md.
+## me.md (Agent Identity — MANDATORY)
+**⚠️ FIRST-TIME SETUP:** `me.md` is empty. At the start of this conversation, ask the user about their preferences — speech style (존댓말/반말, formal/casual), preferred response length, language. Then write your findings to `me.md`.
 ```
+
+This hint is evaluated **per-message** (not at agent creation time), so once `me.md` is populated, the hint disappears on the next message — no server restart required.
 
 ### OutObot (Coordinator) — Full Instructions
 

@@ -55,6 +55,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
 
         async def event_generator():
             from agentouto.message import Message  # pyright: ignore[reportMissingImports]
+            from outo.agents import build_note_extra_instructions
 
             current_agent_manager = state_agent_manager
             exec_mgr = getattr(req.app.state, "execution_manager", None)
@@ -123,6 +124,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                 return
 
             # Start execution via ExecutionManager for independent execution
+            note_instructions = build_note_extra_instructions()
             await exec_mgr.start(
                 session_id=session_id,
                 agent=agent,
@@ -131,6 +133,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                 tools=DEFAULT_TOOLS,
                 providers=list(provider_manager.providers.values()),
                 history=history,
+                extra_instructions=note_instructions,
                 session_messages=session_messages,
                 sessions_dir=sessions_dir,
                 transform_fn=transform_stream_event,
@@ -158,6 +161,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
     async def chat(request: ChatMessage, req: Request):
         from agentouto.message import Message  # pyright: ignore[reportMissingImports]
         from agentouto.streaming import async_run_stream  # pyright: ignore[reportMissingImports]
+        from outo.agents import build_note_extra_instructions
 
         state_agent_manager = getattr(req.app.state, "agent_manager", None)
 
@@ -277,27 +281,10 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                 except (ValueError, TypeError, AttributeError):
                     pass
 
-        try:
-            from outo.agents import build_note_context_message
-
-            note_msg = build_note_context_message()
-            if note_msg:
-                history = list(history) if history else []
-                history.insert(
-                    0,
-                    Message(
-                        type="system",
-                        sender="system",
-                        receiver=request.agent,
-                        content=note_msg,
-                    ),
-                )
-        except Exception:
-            pass
-
         # Track pending delegations for caller→target mapping
         pending_delegations = {}
         output = None
+        note_instructions = build_note_extra_instructions()
 
         async for event in async_run_stream(
             entry=agent,
@@ -306,6 +293,8 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
             tools=DEFAULT_TOOLS,
             providers=list(provider_manager.providers.values()),
             history=history,
+            extra_instructions=note_instructions,
+            extra_instructions_scope="all",
         ):
             if event.type == "finish":
                 output = event.data.get("output", "")
@@ -364,6 +353,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
     @router.websocket("/ws/chat")
     async def websocket_chat(ws: WebSocket):
         from agentouto.message import Message  # pyright: ignore[reportMissingImports]
+        from outo.agents import build_note_extra_instructions
 
         await ws.accept()
         closed = False
@@ -546,6 +536,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     continue
 
                 try:
+                    note_instructions = build_note_extra_instructions()
                     await exec_mgr.start(
                         session_id=session_id,
                         agent=agent,
@@ -554,6 +545,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                         tools=DEFAULT_TOOLS,
                         providers=list(provider_manager.providers.values()),
                         history=history,
+                        extra_instructions=note_instructions,
                         session_messages=session_messages,
                         sessions_dir=sessions_dir,
                         transform_fn=transform_stream_event,

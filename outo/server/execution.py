@@ -92,6 +92,7 @@ class ExecutionManager:
         session_messages: list[object],
         sessions_dir: Path,
         transform_fn: Callable[..., dict[str, Any] | None],
+        extra_instructions: str | None = None,
     ) -> Execution:
         existing = self._executions.get(session_id)
         if existing and existing.status == "running":
@@ -129,6 +130,7 @@ class ExecutionManager:
                 session_messages=session_messages,
                 sessions_dir=sessions_dir,
                 transform_fn=transform_fn,
+                extra_instructions=extra_instructions,
             )
         )
         self._tasks[session_id] = task
@@ -162,6 +164,7 @@ class ExecutionManager:
         session_messages: list[object],
         sessions_dir: Path,
         transform_fn: Callable[..., dict[str, Any] | None],
+        extra_instructions: str | None = None,
     ):
         global async_run_stream, Message
         if async_run_stream is None:
@@ -207,29 +210,6 @@ class ExecutionManager:
             pass
 
         try:
-            from outo.agents import build_note_context_message
-
-            note_msg = build_note_context_message()
-            if note_msg:
-                if history_to_use is None:
-                    history_to_use = []
-                elif isinstance(history_to_use, list):
-                    history_to_use = list(history_to_use)
-                else:
-                    history_to_use = []
-                history_to_use.insert(
-                    0,
-                    Message(
-                        type="system",
-                        sender="system",
-                        receiver=execution.agent_name,
-                        content=note_msg,
-                    ),
-                )
-        except Exception:
-            pass
-
-        try:
             async for event in async_run_stream(
                 entry=agent,
                 message=message,
@@ -237,6 +217,8 @@ class ExecutionManager:
                 tools=tools,
                 providers=providers,
                 history=history_to_use if history_to_use is not None else history,
+                extra_instructions=extra_instructions,
+                extra_instructions_scope="all",
             ):
                 event_data = self._transform_event(
                     transform_fn, event, execution.session_id, pending_delegations

@@ -1,6 +1,6 @@
 """
 OutObot Agent Definitions
-Supports MiniMax, GLM, GLM Coding Plan, Kimi (Moonshot AI)
+Supports MiniMax, GLM, GLM Coding Plan, Kimi (Moonshot AI), Xiaomi MiMo
 """
 
 from pathlib import Path
@@ -31,45 +31,62 @@ def _load_note_file(filename: str) -> str | None:
     return content
 
 
-def build_note_context_message() -> str:
-    parts = []
+def get_me_content() -> str | None:
+    """Load and return me.md content, or None if empty/missing."""
+    return _load_note_file("me.md")
 
-    me_content = _load_note_file("me.md")
-    if me_content:
-        parts.append(
-            "[me.md — 에이전트 정체성 — ⚠️ MANDATORY: 아래 내용을 반드시 따르세요. "
-            "말투, 성격, 톤 등 me.md에 기록된 모든 사항은 절대 규칙입니다. "
-            "이를 위반하는 응답은 금지됩니다.]\n" + me_content
-        )
 
-    important_content = _load_note_file("important.md")
-    if important_content:
-        parts.append(f"[important.md — 사용자 중요 사실]\n{important_content}")
+def get_important_content() -> str | None:
+    """Load and return important.md content, or None if empty/missing."""
+    return _load_note_file("important.md")
 
-    if not parts:
-        return ""
 
+def get_note_catalog() -> str:
+    """Return a catalog of additional note files."""
     note_files = [
         f.name
         for f in NOTE_DIR.glob("*.md")
         if f.name not in ("me.md", "important.md", "README.md")
     ]
-    catalog = ""
-    if note_files:
-        catalog = (
-            "\n\n[기타 note 파일 — 필요시 읽기: cat ~/.outobot/note/<filename>]\n"
-            + "\n".join(f"- {n}" for n in sorted(note_files))
-        )
-
+    if not note_files:
+        return ""
     return (
-        "[Note Context — 매 메시지마다 최신 상태로 로딩됨]\n"
-        + "\n\n".join(parts)
-        + catalog
+        "\n\nOther note files (read on demand: cat ~/.outobot/note/<filename>):\n"
+        + "\n".join(f"- {n}" for n in sorted(note_files))
     )
 
 
-def is_me_empty() -> bool:
-    return _load_note_file("me.md") is None
+def build_note_extra_instructions() -> str | None:
+    """Build extra_instructions string from note files for system prompt injection.
+    Returns None if no note content is available."""
+    parts = []
+
+    me_content = get_me_content()
+    if me_content:
+        parts.append(
+            "## me.md (Agent Identity — MANDATORY)\n"
+            "Follow all rules below. Speech style, personality, tone — "
+            "everything in me.md is absolute and must be obeyed.\n\n" + me_content
+        )
+    else:
+        parts.append(
+            "## me.md (Agent Identity — MANDATORY)\n"
+            "**⚠️ FIRST-TIME SETUP:** `me.md` is empty. At the start of this conversation, ask the user about their preferences — speech style (존댓말/반말, formal/casual), preferred response length, language. Then write your findings to `me.md`."
+        )
+
+    important_content = get_important_content()
+    if important_content:
+        parts.append(
+            "## important.md (User Context — MANDATORY)\n"
+            "Reflect all user preferences, habits, context, and background "
+            "recorded below. Never ignore this information.\n\n" + important_content
+        )
+
+    if not parts:
+        return None
+
+    catalog = get_note_catalog()
+    return "\n\n".join(parts) + catalog
 
 
 class AgentManager:
@@ -95,6 +112,8 @@ class AgentManager:
             "glm_coding": "GLM-5",
             "kimi": "kimi-k2.5",
             "kimi_code": "kimi-k2.5",
+            "xiaomi": "mimo-v2-flash",
+            "xiaomi_token_plan": "mimo-v2-flash",
         }
         return defaults.get(provider, "gpt-5.2")
 
@@ -139,6 +158,8 @@ class AgentManager:
             "glm_coding",
             "kimi",
             "kimi_code",
+            "xiaomi",
+            "xiaomi_token_plan",
             "openai",
             "anthropic",
             "google",
@@ -156,11 +177,6 @@ class AgentManager:
         )
 
         skills_list = self._build_skills_list()
-        me_empty_hint = (
-            "\n**⚠️ FIRST-TIME SETUP:** `me.md` is empty. At the start of this conversation, ask the user about their preferences — speech style (존댓말/반말, formal/casual), preferred response length, language. Then write your findings to `me.md`."
-            if is_me_empty()
-            else ""
-        )
 
         skill_info = f"""
 ## Available Skills
@@ -175,29 +191,41 @@ You have these skills available. To use a skill:
 
 Skills are stored in ~/.outobot/skills/ directory. Each skill has a SKILL.md file with full documentation.
 
-## Note System (~/.outobot/note/)
+## 🔴 Note System (~/.outobot/note/) — MANDATORY, HIGHEST PRIORITY
 
 You have a personal knowledge base for recording and recalling information across sessions.
+**This is not optional. Recording information to notes is a CORE part of your job.**
+
+**Why this matters:** The user will have many conversations with you over time. Notes are your ONLY long-term memory. If you don't record something, it's gone forever. Over-record, never under-record.
 
 **Core Files (auto-attached every message — always up to date):**
 - `me.md` — Your agent identity: speech style, tone, personality traits. Write what you learn about yourself through user interactions.
-- `important.md` — Important facts about the user: preferences, tastes, workflow, projects, language preference. Record anything worth remembering.
+- `important.md` — Important facts about the user: preferences, tastes, workflow, projects, language preference. Record ANYTHING worth remembering. This includes:
+  - Communication preferences (language, formality, response length, detail level)
+  - Technical preferences (frameworks, tools, coding style, editor, OS)
+  - Personal context (projects they're working on, deadlines, team structure)
+  - Recurring patterns (common tasks, frequent questions, workflow habits)
+  - Opinions and tastes (likes/dislikes, design preferences, aesthetic sense)
+  - Life context (schedule, timezone, work hours, anything they mention)
+  - Anything else — when in doubt, RECORD IT
 
 **Categorized Note Files (read on demand):**
-- Create topic-specific `.md` files for any information worth remembering: `project-alpha.md`, `api-patterns.md`, `architecture-decisions.md`, `learning-log.md`, `bug-history.md`, etc.
+- Create topic-specific `.md` files for ANY information worth remembering: `project-alpha.md`, `api-patterns.md`, `architecture-decisions.md`, `learning-log.md`, `bug-history.md`, `user-workstyle.md`, `taste-profile.md`, etc.
 - Discover available notes: `run_bash: ls ~/.outobot/note/`
 - Read a specific note: `run_bash: cat ~/.outobot/note/<filename>`
 - Organize freely — use directories if needed (e.g., `~/.outobot/note/projects/alpha.md`)
 
-**Rules:**
-1. Write to note files WITHOUT being asked — proactively record useful information
-2. When you learn something about the user → immediately update `important.md`
-3. When the user comments on your style or you adapt → update `me.md`
+**Rules (MANDATORY — violations mean losing user trust):**
+1. **AGGRESSIVELY write to note files** — do NOT wait to be asked. If you learn ANYTHING about the user, RECORD IT IMMEDIATELY. This is the single most important rule.
+2. When you learn ANYTHING about the user → **immediately** update `important.md` (preferences, habits, context, background, opinions, constraints — everything)
+3. When the user comments on your style, corrects you, or you adapt → update `me.md`
 4. When you research a topic, solve a problem, or make a decision → create/update a categorized note file
-5. Use `run_bash` to read/write files (cat / heredoc)
-6. Keep notes concise and scannable — bullet points and headers
-7. DO NOT record sensitive data (passwords, API keys, personal secrets)
-{me_empty_hint}"""
+5. When the user mentions personal details (hobbies, schedule, family, pets, health, mood) → record in `important.md` or a separate note
+6. When the user expresses frustration, satisfaction, or any sentiment about your behavior → record in `me.md` and adjust
+7. Use `run_bash` to read/write files (cat / heredoc)
+8. Keep notes concise and scannable — bullet points and headers
+9. DO NOT record sensitive data (passwords, API keys, personal secrets)
+10. **When in doubt about whether to record something → RECORD IT.** There is no penalty for over-recording. There IS a penalty for forgetting."""
 
         self.agents["outo"] = Agent(
             name="outo",

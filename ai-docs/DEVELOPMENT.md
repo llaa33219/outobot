@@ -218,11 +218,17 @@ Session load/save plus execution state persistence functions:
 
 ## Recent Changes
 
+### Fix: First-Time Setup Hint Stale on New Sessions (2026-04-04)
+- `me_empty_hint` removed from static agent instructions (`_build_agents()`)
+- `build_note_extra_instructions()` now dynamically checks `me.md` state at message time
+- Hint disappears immediately after `me.md` is written — no server restart needed
+- See CHANGELOG.md for full details
+
 ### Note System & Dynamic Skills (2026-04-02)
 - Added persistent Note System at `~/.outobot/note/` with `me.md` and `important.md`
 - Note context auto-attached to every agent message as a system message
 - `build_note_context_message()` reads notes from disk on every request (always fresh)
-- `is_me_empty()` triggers first-time setup hint when `me.md` is empty
+- `build_note_extra_instructions()` dynamically injects first-time setup hint when `me.md` is empty
 - Skills list now dynamically generated from installed skills (`_build_skills_list()`)
 - Note context injected in `outo/server/execution.py` and `outo/server/routes/chat.py`
 - Agents instructed to proactively write notes and ask user preferences on first run

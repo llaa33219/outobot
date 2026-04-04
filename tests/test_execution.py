@@ -364,3 +364,100 @@ class TestExecutionManager:
         # Second should be None (end of stream)
         evt = await asyncio.wait_for(queue.get(), timeout=0.1)
         assert evt is None
+
+    @pytest.mark.asyncio
+    async def test_extra_instructions_passed_to_async_run_stream(
+        self, simple_event_sequence
+    ):
+        ExecutionManager = _load_execution_manager()
+
+        exec_mgr = ExecutionManager()
+
+        async def stream():
+            for evt in simple_event_sequence:
+                yield evt
+
+        with patch(
+            "outo.server.execution.async_run_stream", return_value=stream()
+        ) as mock_run:
+            await exec_mgr.start(
+                session_id="test_extra_instructions",
+                agent=MagicMock(),
+                message="test",
+                agents=[],
+                tools=[],
+                providers=[],
+                history=None,
+                session_messages=[],
+                sessions_dir=MagicMock(),
+                transform_fn=lambda e: {"type": e.type, "data": e.data},
+                extra_instructions="Follow this guidance",
+            )
+            await asyncio.sleep(0.05)
+
+            assert mock_run.call_args is not None
+            assert (
+                mock_run.call_args.kwargs.get("extra_instructions")
+                == "Follow this guidance"
+            )
+
+    @pytest.mark.asyncio
+    async def test_extra_instructions_defaults_to_none(self, simple_event_sequence):
+        ExecutionManager = _load_execution_manager()
+
+        exec_mgr = ExecutionManager()
+
+        async def stream():
+            for evt in simple_event_sequence:
+                yield evt
+
+        with patch(
+            "outo.server.execution.async_run_stream", return_value=stream()
+        ) as mock_run:
+            await exec_mgr.start(
+                session_id="test_extra_instructions_default",
+                agent=MagicMock(),
+                message="test",
+                agents=[],
+                tools=[],
+                providers=[],
+                history=None,
+                session_messages=[],
+                sessions_dir=MagicMock(),
+                transform_fn=lambda e: {"type": e.type, "data": e.data},
+            )
+            await asyncio.sleep(0.05)
+
+            assert mock_run.call_args is not None
+            assert mock_run.call_args.kwargs.get("extra_instructions") is None
+
+    @pytest.mark.asyncio
+    async def test_extra_instructions_scope_always_all(self, simple_event_sequence):
+        ExecutionManager = _load_execution_manager()
+
+        exec_mgr = ExecutionManager()
+
+        async def stream():
+            for evt in simple_event_sequence:
+                yield evt
+
+        with patch(
+            "outo.server.execution.async_run_stream", return_value=stream()
+        ) as mock_run:
+            await exec_mgr.start(
+                session_id="test_extra_instructions_scope",
+                agent=MagicMock(),
+                message="test",
+                agents=[],
+                tools=[],
+                providers=[],
+                history=None,
+                session_messages=[],
+                sessions_dir=MagicMock(),
+                transform_fn=lambda e: {"type": e.type, "data": e.data},
+                extra_instructions="Any instructions",
+            )
+            await asyncio.sleep(0.05)
+
+            assert mock_run.call_args is not None
+            assert mock_run.call_args.kwargs.get("extra_instructions_scope") == "all"

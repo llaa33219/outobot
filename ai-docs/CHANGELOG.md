@@ -1,5 +1,36 @@
 # OutObot Changelog
 
+## 2026-04-04 - Fix: First-Time Setup Hint Stale on New Sessions
+
+### Problem
+
+When `me.md` was already populated, new sessions still asked the user about their preferences as if it was the first meeting. The `me_empty_hint` was computed once at `AgentManager` creation time (`_build_agents()`) and baked into the agent's static instructions. If `me.md` was later populated, the hint persisted until server restart.
+
+### Solution
+
+Moved the first-time setup hint from static agent instructions to dynamic per-message injection:
+
+- **Removed**: `me_empty_hint` from `_build_agents()` (line ~175 in `outo/agents.py`)
+- **Added**: Dynamic empty check in `build_note_extra_instructions()` — if `me.md` is empty at message time, the hint is injected; once populated, it disappears on the next message
+
+### Files Changed
+
+- `outo/agents.py`: Removed static `me_empty_hint` variable, added `else` branch in `build_note_extra_instructions()` to inject hint dynamically
+- `tests/test_agents.py`: Updated 4 tests to reflect new behavior (hint returns non-None when no notes exist, includes me.md section with hint when only important.md exists)
+- `ai-docs/AGENTS.md`: Updated documentation to describe dynamic injection behavior
+
+### Before vs After
+
+```
+Before: _build_agents() → get_me_content() → hint baked into instructions
+        (hint persists until server restart, even after me.md is written)
+
+After:  build_note_extra_instructions() → get_me_content() → hint injected per-message
+        (hint disappears immediately after me.md is written — no restart needed)
+```
+
+---
+
 ## 2026-04-02 - Note System & Dynamic Skills List
 
 ### Summary

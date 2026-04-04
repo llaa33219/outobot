@@ -11,6 +11,8 @@ const PROVIDER_KEYS = [
   { name: 'glm', inputId: 'glmKeyInput', statusId: 'glmStatus', key: 'glm' },
   { name: 'glm_coding', inputId: 'glmCodingKeyInput', statusId: 'glmCodingStatus', key: 'glm_coding' },
   { name: 'kimi', inputId: 'kimiKeyInput', statusId: 'kimiStatus', key: 'kimi' },
+  { name: 'xiaomi', inputId: 'xiaomiKeyInput', statusId: 'xiaomiStatus', key: 'xiaomi' },
+  { name: 'xiaomi_token_plan', inputId: 'xiaomiTokenPlanKeyInput', statusId: 'xiaomiTokenPlanStatus', key: 'xiaomi_token_plan' },
 ];
 
 const AGENT_DEFAULTS = {
@@ -43,9 +45,14 @@ class OutObotChat {
       sidebarSessions: document.getElementById('sidebarSessions'),
       sessionList: document.getElementById('sessionList'),
       activityLog: document.getElementById('activityLog'),
-      settingsModal: document.getElementById('settingsModal'),
+      settingsModalsContainer: document.getElementById('settingsModalsContainer'),
+      apiKeysModal: document.getElementById('apiKeysModal'),
+      modelModal: document.getElementById('modelModal'),
+      discordModal: document.getElementById('discordModal'),
+      apiKeysModalClose: document.getElementById('apiKeysModalClose'),
+      modelModalClose: document.getElementById('modelModalClose'),
+      discordModalClose: document.getElementById('discordModalClose'),
       skillsModal: document.getElementById('skillsModal'),
-      modalClose: document.getElementById('modalClose'),
       defaultProviderSelect: document.getElementById('defaultProviderSelect'),
       defaultModelSelect: document.getElementById('defaultModelSelect'),
       saveFeedback: document.getElementById('saveFeedback'),
@@ -99,7 +106,9 @@ class OutObotChat {
   bindEvents() {
     this.els.settingsToggle.addEventListener('click', () => this.openSettings());
     this.els.skillsToggle.addEventListener('click', () => this.openSkills());
-    this.els.modalClose.addEventListener('click', () => this.closeSettings());
+    this.els.apiKeysModalClose.addEventListener('click', () => this.closeSettings());
+    this.els.modelModalClose.addEventListener('click', () => this.closeSettings());
+    this.els.discordModalClose.addEventListener('click', () => this.closeSettings());
     document.getElementById('skillsModalClose')?.addEventListener('click', () => this.closeSkills());
     document.getElementById('skillsCloseBtn')?.addEventListener('click', () => this.closeSkills());
     document.getElementById('syncSkillsBtn')?.addEventListener('click', () => this.syncSkills());
@@ -156,7 +165,7 @@ class OutObotChat {
 
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
-        if (!this.els.settingsModal.classList.contains('hidden')) {
+        if (!this.els.settingsModalsContainer.classList.contains('hidden')) {
           this.closeSettings();
         } else if (!this.els.sidebar.classList.contains('collapsed') && window.innerWidth <= 960) {
           this.toggleSidebar();
@@ -164,8 +173,8 @@ class OutObotChat {
       }
     });
 
-    this.els.settingsModal.addEventListener('click', (e) => {
-      if (e.target === this.els.settingsModal) {
+    this.els.settingsModalsContainer.addEventListener('click', (e) => {
+      if (e.target === this.els.settingsModalsContainer || e.target.classList.contains('modal-overlay')) {
         this.closeSettings();
       }
     });
@@ -383,6 +392,8 @@ class OutObotChat {
       glm_coding: ['GLM-5', 'GLM-4.7'],
       kimi: ['kimi-k2.5', 'kimi-k2.5-thinking', 'kimi-k2'],
       kimi_code: ['kimi-k2.5', 'kimi-k2.5-thinking', 'kimi-k2'],
+      xiaomi: ['mimo-v2-flash', 'mimo-v2-pro', 'mimo-v2-omni'],
+      xiaomi_token_plan: ['mimo-v2-flash', 'mimo-v2-pro', 'mimo-v2-omni'],
     };
     return defaults[providerName] || [];
   }
@@ -390,13 +401,13 @@ class OutObotChat {
   populateDefaultProviderSelect() {
     if (!this.els.defaultProviderSelect) return;
     const sel = this.els.defaultProviderSelect;
+    const currentSelection = sel.value;
     sel.innerHTML = '';
     
-    const providers = ['openai', 'anthropic', 'google', 'minimax', 'glm', 'glm_coding', 'kimi'];
     const availableProviders = [];
     
-    providers.forEach(key => {
-      const input = document.getElementById(`${key}KeyInput`);
+    PROVIDER_KEYS.forEach(({ key, inputId }) => {
+      const input = document.getElementById(inputId);
       const apiKey = input?.value?.trim() || '';
       const config = this.providerConfig[key] || {};
       
@@ -417,7 +428,9 @@ class OutObotChat {
       minimax: 'MiniMax',
       glm: 'GLM',
       glm_coding: 'GLM Coding Plan',
-      kimi: 'Kimi'
+      kimi: 'Kimi',
+      xiaomi: 'Xiaomi MiMo',
+      xiaomi_token_plan: 'Xiaomi MiMo Token Plan'
     };
     
     availableProviders.forEach(key => {
@@ -428,7 +441,9 @@ class OutObotChat {
     });
     
     const defaultProvider = this.providerConfig.default_provider;
-    if (defaultProvider && availableProviders.includes(defaultProvider)) {
+    if (currentSelection && availableProviders.includes(currentSelection)) {
+      sel.value = currentSelection;
+    } else if (defaultProvider && availableProviders.includes(defaultProvider)) {
       sel.value = defaultProvider;
     } else {
       sel.value = availableProviders[0];
@@ -439,6 +454,7 @@ class OutObotChat {
     if (!this.els.defaultModelSelect) return;
     const providerName = this.els.defaultProviderSelect?.value;
     const sel = this.els.defaultModelSelect;
+    const currentModel = sel.value;
     sel.innerHTML = '';
     
     const models = this.getProviderModels(providerName);
@@ -450,8 +466,12 @@ class OutObotChat {
     });
     
     const config = this.providerConfig[providerName];
-    if (config && config.model) {
+    if (currentModel && models.includes(currentModel)) {
+      sel.value = currentModel;
+    } else if (config && config.model && models.includes(config.model)) {
       sel.value = config.model;
+    } else if (models.length > 0) {
+      sel.value = models[0];
     }
   }
 
@@ -481,7 +501,7 @@ class OutObotChat {
   checkWelcomeSetup() {
     if (!this.els.welcomeSetup) return;
     
-    const providerKeys = ['openai', 'anthropic', 'google', 'minimax', 'glm', 'glm_coding', 'kimi'];
+    const providerKeys = ['openai', 'anthropic', 'google', 'minimax', 'glm', 'glm_coding', 'kimi', 'xiaomi', 'xiaomi_token_plan'];
     const configured = providerKeys.filter(key => {
       const val = this.providerConfig[key];
       return val && (val.api_key || val.enabled);
@@ -880,7 +900,7 @@ class OutObotChat {
     this.syncSettingsInputs();
     this.populateDefaultProviderSelect();
     this.updateDefaultModels();
-    this.els.settingsModal.classList.remove('hidden');
+    this.els.settingsModalsContainer.classList.remove('hidden');
   }
 
   syncSettingsInputs() {
@@ -923,7 +943,7 @@ class OutObotChat {
   }
 
   closeSettings() {
-    this.els.settingsModal.classList.add('hidden');
+    this.els.settingsModalsContainer.classList.add('hidden');
   }
 
   async openSkills() {
@@ -966,20 +986,17 @@ class OutObotChat {
   }
 
   async saveSettings() {
-    const providerKeys = ['openai', 'anthropic', 'google', 'minimax', 'glm', 'glm_coding', 'kimi'];
-    
     const newConfig = { ...this.providerConfig };
     
-    providerKeys.forEach(key => {
-      const input = document.getElementById(`${key}KeyInput`);
-      const apiKey = input?.value?.trim() || '';
+    PROVIDER_KEYS.forEach(({ key, inputId }) => {
+      const input = document.getElementById(inputId);
+      if (!input) return;
+      const apiKey = input.value.trim();
       if (!newConfig[key]) {
         newConfig[key] = { enabled: false, api_key: '', model: '' };
       }
-      if (apiKey) {
-        newConfig[key].api_key = apiKey;
-        newConfig[key].enabled = true;
-      }
+      newConfig[key].api_key = apiKey;
+      newConfig[key].enabled = !!apiKey;
     });
 
     const defaultProvider = this.els.defaultProviderSelect?.value;
@@ -999,7 +1016,7 @@ class OutObotChat {
         await this.loadProviders();
         this.checkWelcomeSetup();
         this.updateProviderStatuses();
-        this.closeSettings();
+        setTimeout(() => this.closeSettings(), 800);
       } else {
         this.showSaveFeedback('Failed to save settings', true);
       }

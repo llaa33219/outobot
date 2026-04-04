@@ -53,6 +53,8 @@ Go to the **Settings** tab and enter API keys for your preferred AI provider:
 - **GLM Coding Plan** - GLM coding-optimized model (GLM-5)
 - **Kimi** - Moonshot AI (kimi-k2.5)
 - **Kimi Code Plan** - Kimi coding-optimized model (kimi-k2.5)
+- **Xiaomi MiMo** - Xiaomi AI (mimo-v2-flash, mimo-v2-pro, mimo-v2-omni)
+- **Xiaomi MiMo Token Plan** - Xiaomi AI token plan (mimo-v2-flash, mimo-v2-pro, mimo-v2-omni)
 
 Check "Enable", enter your API key, select a model, then click **Save Configuration**.
 

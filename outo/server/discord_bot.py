@@ -108,9 +108,11 @@ class OutobotDiscord:
 
         @self.client.event
         async def on_ready():
-            print(
-                f"Discord bot logged in as {self.client.user} (ID: {self.client.user.id})"
-            )
+            user = self.client.user
+            if user is None:
+                print("Discord bot connected, but user is unavailable")
+                return
+            print(f"Discord bot logged in as {user} (ID: {user.id})")
             print(f"Connected to {len(self.client.guilds)} server(s)")
 
         self._bot_task: asyncio.Task[None] | None = None
@@ -149,9 +151,11 @@ class OutobotDiscord:
 
         @self.client.event
         async def on_ready():
-            print(
-                f"Discord bot logged in as {self.client.user} (ID: {self.client.user.id})"
-            )
+            user = self.client.user
+            if user is None:
+                print("Discord bot connected, but user is unavailable")
+                return
+            print(f"Discord bot logged in as {user} (ID: {user.id})")
             print(f"Connected to {len(self.client.guilds)} server(s)")
 
         await self.start()
@@ -202,6 +206,7 @@ class OutobotDiscord:
     ) -> str:
         from agentouto.message import Message
         from agentouto.streaming import async_run_stream
+        from outo.agents import build_note_extra_instructions
 
         agent_name = agent_name or "outo"
 
@@ -288,6 +293,7 @@ class OutobotDiscord:
                     pass
 
         output = None
+        note_instructions = build_note_extra_instructions()
         try:
             async for event in async_run_stream(
                 entry=agent,
@@ -296,6 +302,8 @@ class OutobotDiscord:
                 tools=DEFAULT_TOOLS,
                 providers=list(self.provider_manager.providers.values()),
                 history=history,
+                extra_instructions=note_instructions,
+                extra_instructions_scope="all",
             ):
                 if event.type == "finish":
                     output = event.data.get("output", "")

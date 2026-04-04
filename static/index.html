@@ -135,188 +135,245 @@
       </aside>
     </div>
 
-    <div class="modal-overlay hidden" id="settingsModal">
-      <div class="modal">
-        <div class="modal-header">
-          <h2>⚙️ Settings</h2>
-          <button class="btn-icon modal-close" id="modalClose">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
+    <div class="settings-modals-container hidden" id="settingsModalsContainer">
+      <div class="modal-overlay" id="apiKeysModal">
+        <div class="modal">
+          <div class="modal-header">
+            <h2>🔑 API Keys</h2>
+            <button class="btn-icon modal-close" id="apiKeysModalClose">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <div class="modal-body">
+            <section class="modal-section">
+              <p class="section-desc">Enter API keys for each provider. Keys are saved in the server config.</p>
+
+              <div class="api-key-field">
+                <div class="api-key-header">
+                  <label>OpenAI</label>
+                  <span class="key-status" id="openaiStatus"></span>
+                </div>
+                <div class="key-input-row">
+                  <input type="password" id="openaiKeyInput" placeholder="sk-..." autocomplete="off" spellcheck="false">
+                  <button class="btn-icon key-toggle" data-target="openaiKeyInput" title="Show/Hide">
+                    <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <svg class="eye-closed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                  </button>
+                  <button class="btn-icon key-clear" data-target="openaiKeyInput" title="Clear">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="api-key-field">
+                <div class="api-key-header">
+                  <label>Anthropic</label>
+                  <span class="key-status" id="anthropicStatus"></span>
+                </div>
+                <div class="key-input-row">
+                  <input type="password" id="anthropicKeyInput" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
+                  <button class="btn-icon key-toggle" data-target="anthropicKeyInput" title="Show/Hide">
+                    <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <svg class="eye-closed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                  </button>
+                  <button class="btn-icon key-clear" data-target="anthropicKeyInput" title="Clear">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="api-key-field">
+                <div class="api-key-header">
+                  <label>Google</label>
+                  <span class="key-status" id="googleStatus"></span>
+                </div>
+                <div class="key-input-row">
+                  <input type="password" id="googleKeyInput" placeholder="AI..." autocomplete="off" spellcheck="false">
+                  <button class="btn-icon key-toggle" data-target="googleKeyInput" title="Show/Hide">
+                    <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <svg class="eye-closed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                  </button>
+                  <button class="btn-icon key-clear" data-target="googleKeyInput" title="Clear">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="api-key-divider">Additional Providers</div>
+
+              <div class="api-key-field">
+                <div class="api-key-header">
+                  <label>MiniMax</label>
+                  <span class="key-status" id="minimaxStatus"></span>
+                </div>
+                <div class="key-input-row">
+                  <input type="password" id="minimaxKeyInput" placeholder="API key" autocomplete="off" spellcheck="false">
+                  <button class="btn-icon key-toggle" data-target="minimaxKeyInput" title="Show/Hide">
+                    <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <svg class="eye-closed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                  </button>
+                  <button class="btn-icon key-clear" data-target="minimaxKeyInput" title="Clear">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="api-key-field">
+                <div class="api-key-header">
+                  <label>GLM (Zhipu AI)</label>
+                  <span class="key-status" id="glmStatus"></span>
+                </div>
+                <div class="key-input-row">
+                  <input type="password" id="glmKeyInput" placeholder="API key" autocomplete="off" spellcheck="false">
+                  <button class="btn-icon key-toggle" data-target="glmKeyInput" title="Show/Hide">
+                    <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <svg class="eye-closed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                  </button>
+                  <button class="btn-icon key-clear" data-target="glmKeyInput" title="Clear">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="api-key-field">
+                <div class="api-key-header">
+                  <label>GLM Coding Plan</label>
+                  <span class="key-status" id="glmCodingStatus"></span>
+                </div>
+                <div class="key-input-row">
+                  <input type="password" id="glmCodingKeyInput" placeholder="API key" autocomplete="off" spellcheck="false">
+                  <button class="btn-icon key-toggle" data-target="glmCodingKeyInput" title="Show/Hide">
+                    <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <svg class="eye-closed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                  </button>
+                  <button class="btn-icon key-clear" data-target="glmCodingKeyInput" title="Clear">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="api-key-field">
+                <div class="api-key-header">
+                  <label>Kimi (Moonshot AI)</label>
+                  <span class="key-status" id="kimiStatus"></span>
+                </div>
+                <div class="key-input-row">
+                  <input type="password" id="kimiKeyInput" placeholder="API key" autocomplete="off" spellcheck="false">
+                  <button class="btn-icon key-toggle" data-target="kimiKeyInput" title="Show/Hide">
+                    <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <svg class="eye-closed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                  </button>
+                  <button class="btn-icon key-clear" data-target="kimiKeyInput" title="Clear">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="api-key-field">
+                <div class="api-key-header">
+                  <label>Xiaomi MiMo</label>
+                  <span class="key-status" id="xiaomiStatus"></span>
+                </div>
+                <div class="key-input-row">
+                  <input type="password" id="xiaomiKeyInput" placeholder="API key" autocomplete="off" spellcheck="false">
+                  <button class="btn-icon key-toggle" data-target="xiaomiKeyInput" title="Show/Hide">
+                    <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <svg class="eye-closed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                  </button>
+                  <button class="btn-icon key-clear" data-target="xiaomiKeyInput" title="Clear">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="api-key-field">
+                <div class="api-key-header">
+                  <label>Xiaomi MiMo Token Plan</label>
+                  <span class="key-status" id="xiaomiTokenPlanStatus"></span>
+                </div>
+                <div class="key-input-row">
+                  <input type="password" id="xiaomiTokenPlanKeyInput" placeholder="API key" autocomplete="off" spellcheck="false">
+                  <button class="btn-icon key-toggle" data-target="xiaomiTokenPlanKeyInput" title="Show/Hide">
+                    <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <svg class="eye-closed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                  </button>
+                  <button class="btn-icon key-clear" data-target="xiaomiTokenPlanKeyInput" title="Clear">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+              </div>
+            </section>
+          </div>
+          <div class="modal-footer">
+            <div class="save-feedback" id="saveFeedback"></div>
+            <button class="btn btn-secondary" id="settingsCancel">Cancel</button>
+            <button class="btn btn-primary" id="settingsSave">Save</button>
+          </div>
         </div>
-        <div class="modal-body">
-          <section class="modal-section">
-            <h3>🔑 API Keys</h3>
-            <p class="section-desc">Enter API keys for each provider. Keys are saved in the server config.</p>
+      </div>
 
-            <div class="api-key-field">
-              <div class="api-key-header">
-                <label>OpenAI</label>
-                <span class="key-status" id="openaiStatus"></span>
+      <div class="modal-overlay" id="modelModal">
+        <div class="modal">
+          <div class="modal-header">
+            <h2>🎯 Default Model</h2>
+            <button class="btn-icon modal-close" id="modelModalClose">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <div class="modal-body">
+            <section class="modal-section">
+              <p class="section-desc">Select which provider and model to use for all agents.</p>
+              <div class="modal-row">
+                <label for="defaultProviderSelect">Provider</label>
+                <select id="defaultProviderSelect"></select>
               </div>
-              <div class="key-input-row">
-                <input type="password" id="openaiKeyInput" placeholder="sk-..." autocomplete="off" spellcheck="false">
-                <button class="btn-icon key-toggle" data-target="openaiKeyInput" title="Show/Hide">
-                  <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                  <svg class="eye-closed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                </button>
-                <button class="btn-icon key-clear" data-target="openaiKeyInput" title="Clear">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
+              <div class="modal-row">
+                <label for="defaultModelSelect">Model</label>
+                <select id="defaultModelSelect"></select>
               </div>
-            </div>
-
-            <div class="api-key-field">
-              <div class="api-key-header">
-                <label>Anthropic</label>
-                <span class="key-status" id="anthropicStatus"></span>
-              </div>
-              <div class="key-input-row">
-                <input type="password" id="anthropicKeyInput" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
-                <button class="btn-icon key-toggle" data-target="anthropicKeyInput" title="Show/Hide">
-                  <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                  <svg class="eye-closed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                </button>
-                <button class="btn-icon key-clear" data-target="anthropicKeyInput" title="Clear">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
-              </div>
-            </div>
-
-            <div class="api-key-field">
-              <div class="api-key-header">
-                <label>Google</label>
-                <span class="key-status" id="googleStatus"></span>
-              </div>
-              <div class="key-input-row">
-                <input type="password" id="googleKeyInput" placeholder="AI..." autocomplete="off" spellcheck="false">
-                <button class="btn-icon key-toggle" data-target="googleKeyInput" title="Show/Hide">
-                  <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                  <svg class="eye-closed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                </button>
-                <button class="btn-icon key-clear" data-target="googleKeyInput" title="Clear">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
-              </div>
-            </div>
-
-            <div class="api-key-divider">Additional Providers</div>
-
-            <div class="api-key-field">
-              <div class="api-key-header">
-                <label>MiniMax</label>
-                <span class="key-status" id="minimaxStatus"></span>
-              </div>
-              <div class="key-input-row">
-                <input type="password" id="minimaxKeyInput" placeholder="API key" autocomplete="off" spellcheck="false">
-                <button class="btn-icon key-toggle" data-target="minimaxKeyInput" title="Show/Hide">
-                  <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                  <svg class="eye-closed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                </button>
-                <button class="btn-icon key-clear" data-target="minimaxKeyInput" title="Clear">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
-              </div>
-            </div>
-
-            <div class="api-key-field">
-              <div class="api-key-header">
-                <label>GLM (Zhipu AI)</label>
-                <span class="key-status" id="glmStatus"></span>
-              </div>
-              <div class="key-input-row">
-                <input type="password" id="glmKeyInput" placeholder="API key" autocomplete="off" spellcheck="false">
-                <button class="btn-icon key-toggle" data-target="glmKeyInput" title="Show/Hide">
-                  <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                  <svg class="eye-closed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                </button>
-                <button class="btn-icon key-clear" data-target="glmKeyInput" title="Clear">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
-              </div>
-            </div>
-
-            <div class="api-key-field">
-              <div class="api-key-header">
-                <label>GLM Coding Plan</label>
-                <span class="key-status" id="glmCodingStatus"></span>
-              </div>
-              <div class="key-input-row">
-                <input type="password" id="glmCodingKeyInput" placeholder="API key" autocomplete="off" spellcheck="false">
-                <button class="btn-icon key-toggle" data-target="glmCodingKeyInput" title="Show/Hide">
-                  <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                  <svg class="eye-closed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                </button>
-                <button class="btn-icon key-clear" data-target="glmCodingKeyInput" title="Clear">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
-              </div>
-            </div>
-
-            <div class="api-key-field">
-              <div class="api-key-header">
-                <label>Kimi (Moonshot AI)</label>
-                <span class="key-status" id="kimiStatus"></span>
-              </div>
-              <div class="key-input-row">
-                <input type="password" id="kimiKeyInput" placeholder="API key" autocomplete="off" spellcheck="false">
-                <button class="btn-icon key-toggle" data-target="kimiKeyInput" title="Show/Hide">
-                  <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                  <svg class="eye-closed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                </button>
-                <button class="btn-icon key-clear" data-target="kimiKeyInput" title="Clear">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
-              </div>
-            </div>
-          </section>
-
-          <section class="modal-section">
-            <h3>🎯 Default Provider & Model</h3>
-            <p class="section-desc">Select which provider and model to use for all agents.</p>
-            <div class="modal-row">
-              <label for="defaultProviderSelect">Provider</label>
-              <select id="defaultProviderSelect"></select>
-            </div>
-            <div class="modal-row">
-              <label for="defaultModelSelect">Model</label>
-              <select id="defaultModelSelect"></select>
-            </div>
-          </section>
-
-          <section class="modal-section">
-            <h3>🤖 Discord Bot</h3>
-            <p class="section-desc">Configure the Discord bot integration. The bot responds when mentioned in Discord channels.</p>
-
-            <div class="api-key-field">
-              <div class="api-key-header">
-                <label>Discord Bot Token</label>
-                <span class="key-status" id="discordStatus"></span>
-              </div>
-              <div class="key-input-row">
-                <input type="password" id="discordTokenInput" placeholder="Bot token from Discord Developer Portal" autocomplete="off" spellcheck="false">
-                <button class="btn-icon key-toggle" data-target="discordTokenInput" title="Show/Hide">
-                  <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                  <svg class="eye-closed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                </button>
-                <button class="btn-icon key-clear" data-target="discordTokenInput" title="Clear">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
-              </div>
-            </div>
-
-            <div class="modal-row">
-              <label for="discordEnabled">Enable</label>
-              <select id="discordEnabled">
-                <option value="false">Disabled</option>
-                <option value="true">Enabled</option>
-              </select>
-            </div>
-          </section>
+            </section>
+          </div>
         </div>
-        <div class="modal-footer">
-          <div class="save-feedback" id="saveFeedback"></div>
-          <button class="btn btn-secondary" id="settingsCancel">Cancel</button>
-          <button class="btn btn-primary" id="settingsSave">Save</button>
+      </div>
+
+      <div class="modal-overlay" id="discordModal">
+        <div class="modal">
+          <div class="modal-header">
+            <h2>🤖 Discord Bot</h2>
+            <button class="btn-icon modal-close" id="discordModalClose">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <div class="modal-body">
+            <section class="modal-section">
+              <p class="section-desc">Configure the Discord bot integration. The bot responds when mentioned in Discord channels.</p>
+
+              <div class="api-key-field">
+                <div class="api-key-header">
+                  <label>Discord Bot Token</label>
+                  <span class="key-status" id="discordStatus"></span>
+                </div>
+                <div class="key-input-row">
+                  <input type="password" id="discordTokenInput" placeholder="Bot token from Discord Developer Portal" autocomplete="off" spellcheck="false">
+                  <button class="btn-icon key-toggle" data-target="discordTokenInput" title="Show/Hide">
+                    <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <svg class="eye-closed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                  </button>
+                  <button class="btn-icon key-clear" data-target="discordTokenInput" title="Clear">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="modal-row">
+                <label for="discordEnabled">Enable</label>
+                <select id="discordEnabled">
+                  <option value="false">Disabled</option>
+                  <option value="true">Enabled</option>
+                </select>
+              </div>
+            </section>
+          </div>
         </div>
       </div>
     </div>

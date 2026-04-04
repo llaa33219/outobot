@@ -2089,6 +2089,59 @@ body {
 
 /* ── Settings Modal ─────────────────────────────────── */
 
+.settings-modals-container {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  z-index: 100;
+  animation: overlayIn 0.2s ease;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.settings-modals-container.hidden {
+  display: none;
+}
+
+.settings-modals-container .modal-overlay {
+  position: static;
+  background: none;
+  padding: 0;
+  animation: none;
+  display: flex;
+  flex: 1;
+  max-width: 450px;
+}
+
+.settings-modals-container .modal {
+  width: 100%;
+  max-width: none;
+  height: fit-content;
+}
+
+@media (max-width: 1200px) {
+  .settings-modals-container {
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 40px 20px;
+  }
+  
+  .settings-modals-container .modal-overlay {
+    max-width: 520px;
+    width: 100%;
+    flex: none;
+  }
+  
+  .settings-modals-container .modal {
+    max-height: none;
+  }
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
