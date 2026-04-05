@@ -1,0 +1,32 @@
+name: Auto Version Tag
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate version tag
+        id: generate-tag
+        run: |
+          TIMESTAMP=$(date +'%Y-%m-%d-%H-%M-%S')
+          MICRO=$(date +'%f')
+          TAG="v${TIMESTAMP}"
+
+          if git tag "$TAG" ${{ github.sha }} 2>/dev/null; then
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+          else
+            TAG="v${TIMESTAMP}-${MICRO}"
+            git tag "$TAG" ${{ github.sha }}
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+          fi
+
+          echo "Created tag: $TAG"
+
+      - name: Push tag
+        run: |
+          git push origin ${{ steps.generate-tag.outputs.tag }}
