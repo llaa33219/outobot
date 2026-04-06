@@ -296,9 +296,9 @@ class OutobotDiscord:
         note_instructions = build_note_extra_instructions()
         try:
             async for event in async_run_stream(
-                entry=agent,
+                starting_agents=[agent],
                 message=content,
-                agents=list(self.agent_manager.get_all_agents().values()),
+                run_agents=list(self.agent_manager.get_all_agents().values()),
                 tools=DEFAULT_TOOLS,
                 providers=list(self.provider_manager.providers.values()),
                 history=history,

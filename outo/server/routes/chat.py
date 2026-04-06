@@ -287,9 +287,9 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
         note_instructions = build_note_extra_instructions()
 
         async for event in async_run_stream(
-            entry=agent,
+            starting_agents=[agent],
             message=message_with_attachments,
-            agents=list(state_agent_manager.get_all_agents().values()),
+            run_agents=list(state_agent_manager.get_all_agents().values()),
             tools=DEFAULT_TOOLS,
             providers=list(provider_manager.providers.values()),
             history=history,

@@ -211,9 +211,9 @@ class ExecutionManager:
 
         try:
             async for event in async_run_stream(
-                entry=agent,
+                starting_agents=[agent],
                 message=message,
-                agents=agents,
+                run_agents=agents,
                 tools=tools,
                 providers=providers,
                 history=history_to_use if history_to_use is not None else history,
