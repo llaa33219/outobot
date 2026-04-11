@@ -7,12 +7,23 @@ const PROVIDER_KEYS = [
   { name: 'openai', inputId: 'openaiKeyInput', statusId: 'openaiStatus', key: 'openai' },
   { name: 'anthropic', inputId: 'anthropicKeyInput', statusId: 'anthropicStatus', key: 'anthropic' },
   { name: 'google', inputId: 'googleKeyInput', statusId: 'googleStatus', key: 'google' },
+  { name: 'mistral', inputId: 'mistralKeyInput', statusId: 'mistralStatus', key: 'mistral' },
+  { name: 'ollama', inputId: 'ollamaKeyInput', statusId: 'ollamaStatus', key: 'ollama' },
   { name: 'minimax', inputId: 'minimaxKeyInput', statusId: 'minimaxStatus', key: 'minimax' },
   { name: 'glm', inputId: 'glmKeyInput', statusId: 'glmStatus', key: 'glm' },
   { name: 'glm_coding', inputId: 'glmCodingKeyInput', statusId: 'glmCodingStatus', key: 'glm_coding' },
   { name: 'kimi', inputId: 'kimiKeyInput', statusId: 'kimiStatus', key: 'kimi' },
   { name: 'xiaomi', inputId: 'xiaomiKeyInput', statusId: 'xiaomiStatus', key: 'xiaomi' },
   { name: 'xiaomi_token_plan', inputId: 'xiaomiTokenPlanKeyInput', statusId: 'xiaomiTokenPlanStatus', key: 'xiaomi_token_plan' },
+];
+
+const EMBED_PROVIDER_KEYS = [
+  { name: 'openai', inputId: 'embedOpenaiKeyInput' },
+  { name: 'google', inputId: 'embedGoogleKeyInput' },
+  { name: 'cohere', inputId: 'embedCohereKeyInput' },
+  { name: 'voyage', inputId: 'embedVoyageKeyInput' },
+  { name: 'qwen', inputId: 'embedQwenKeyInput' },
+  { name: 'mistral', inputId: 'embedMistralKeyInput' },
 ];
 
 const AGENT_DEFAULTS = {
@@ -61,11 +72,17 @@ class OutObotChat {
       fileInput: document.getElementById('fileInput'),
       attachBtn: document.getElementById('attachBtn'),
       attachmentPreview: document.getElementById('attachmentPreview'),
+      embedProviderSelect: document.getElementById('embedProviderSelect'),
+      embedModelSelect: document.getElementById('embedModelSelect'),
+      memoryProvider: document.getElementById('memoryProvider'),
+      memoryModel: document.getElementById('memoryModel'),
     };
 
     this.pendingAttachments = [];
     this.providerConfig = {};
     this.discordConfig = {};
+    this.memoryConfig = {};
+    this.embedProviderPresets = {};
     this.agentConfig = AGENT_DEFAULTS;
     this.currentAgent = 'outo';
     this.currentSession = null;
@@ -115,7 +132,34 @@ class OutObotChat {
     document.getElementById('installSkillBtn')?.addEventListener('click', () => this.installSkill());
     this.els.settingsCancel.addEventListener('click', () => this.closeSettings());
     this.els.settingsSave.addEventListener('click', () => this.saveSettings());
+    document.getElementById('openModelSettingsBtn')?.addEventListener('click', () => this.openModelSettings());
+    document.getElementById('openApiKeysBtn')?.addEventListener('click', () => this.openApiKeysSettings());
+    document.getElementById('modelCancel')?.addEventListener('click', () => this.closeSettings());
+    this.els.memoryProvider?.addEventListener('change', () => this.updateMemoryModels());
+    this.els.embedProviderSelect?.addEventListener('change', () => this.populateEmbedModelSelect(this.els.embedProviderSelect?.value));
     this.els.sidebarToggle.addEventListener('click', () => this.toggleSidebar());
+
+    PROVIDER_KEYS.forEach(({ inputId }) => {
+      const input = document.getElementById(inputId);
+      if (input) {
+        input.addEventListener('input', () => {
+          this.populateDefaultProviderSelect();
+          this.updateDefaultModels();
+          this.populateMemoryProviderSelect();
+          this.updateMemoryModels();
+        });
+      }
+    });
+
+    EMBED_PROVIDER_KEYS.forEach(({ inputId }) => {
+      const input = document.getElementById(inputId);
+      if (input) {
+        input.addEventListener('input', () => {
+          this.populateEmbedProviderSelect();
+          this.populateEmbedModelSelect(this.els.embedProviderSelect?.value);
+        });
+      }
+    });
     this.els.sendBtn.addEventListener('click', () => this.sendMessage());
     this.els.attachBtn.addEventListener('click', () => this.els.fileInput.click());
     this.els.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
@@ -191,6 +235,19 @@ class OutObotChat {
     this.els.defaultModelSelect?.addEventListener('change', () => {
     });
 
+    this.els.embedProviderSelect?.addEventListener('change', () => {
+      const provider = this.els.embedProviderSelect.value;
+      this.populateEmbedModelSelect(provider);
+      const preset = this.embedProviderPresets[provider];
+      const urlInput = document.getElementById('embedUrlInput');
+      if (urlInput && preset) {
+        urlInput.value = preset.url || '';
+        urlInput.readOnly = (provider !== 'custom' && provider !== '');
+      } else if (urlInput) {
+        urlInput.readOnly = false;
+      }
+    });
+
     PROVIDER_KEYS.forEach(({ inputId }) => {
       const input = document.getElementById(inputId);
       if (input) {
@@ -213,7 +270,8 @@ class OutObotChat {
         this.loadAgents(),
         this.sessionManager.loadSessions(),
         this.loadSkills(),
-        this.loadDiscordConfig()
+        this.loadDiscordConfig(),
+        this.loadEmbedProviders()
       ]);
       
       this.buildAgentBar();
@@ -263,6 +321,7 @@ class OutObotChat {
       this.reconnectDelay = 1000;
       this.reconnecting = false;
       this.logActivity('Connected to server');
+      this.checkMemoryHealth();
       this.restoreActiveExecution();
     };
 
@@ -337,6 +396,135 @@ class OutObotChat {
       this.discordConfig = await res.json();
     } catch (err) {
       console.error('Failed to load Discord config:', err);
+    }
+  }
+
+  async loadMemoryConfig() {
+    try {
+      const res = await fetch('/api/memory/config');
+      if (res.ok) {
+        this.memoryConfig = await res.json();
+      }
+    } catch (err) {
+      console.error('Failed to load memory config:', err);
+    }
+  }
+
+  async checkMemoryHealth() {
+    try {
+      const res = await fetch('/api/memory/health');
+      if (!res.ok) return;
+      const status = await res.json();
+      
+      if (status.healthy) {
+        const lancedb = status.lancedb?.connected ? '✅' : '❌';
+        const neo4j = status.neo4j?.connected ? '✅' : '❌';
+        const embedding = status.embedding?.working ? '✅' : '❌';
+        const detail = `LanceDB ${lancedb} | Neo4j ${neo4j} | Embedding ${embedding}`;
+        this.addLogEntry('🧠', '<strong>Memory</strong> system healthy', null, detail);
+      } else {
+        const reason = status.reason || 'Unknown error';
+        this.addLogEntry('⚠️', '<strong>Memory</strong> system issue', 'warning', reason);
+      }
+    } catch (err) {
+      this.addLogEntry('⚠️', '<strong>Memory</strong> health check failed', 'warning', err.message);
+    }
+  }
+
+  async loadEmbedProviders() {
+    try {
+      const res = await fetch('/api/memory/embed-providers');
+      if (res.ok) {
+        this.embedProviderPresets = await res.json();
+      }
+    } catch (err) {
+      console.error('Failed to load embed providers:', err);
+    }
+  }
+
+  populateEmbedProviderSelect() {
+    const sel = this.els.embedProviderSelect;
+    if (!sel) return;
+    sel.innerHTML = '';
+
+    const emptyOpt = document.createElement('option');
+    emptyOpt.value = '';
+    emptyOpt.textContent = 'Select provider...';
+    sel.appendChild(emptyOpt);
+
+    Object.entries(this.embedProviderPresets).forEach(([key, preset]) => {
+      const embedKeyInfo = EMBED_PROVIDER_KEYS.find(p => p.name === key);
+      const embedKeyInput = embedKeyInfo ? document.getElementById(embedKeyInfo.inputId) : null;
+      const hasApiKey = embedKeyInput?.value?.trim() || this.memoryConfig.embed_provider === key;
+      if (hasApiKey) {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = preset.name;
+        sel.appendChild(opt);
+      }
+    });
+
+    const current = this.memoryConfig.embed_provider || '';
+    if (current) sel.value = current;
+  }
+
+  getEmbedApiKeyForSave() {
+    const selectedProvider = this.els.embedProviderSelect?.value || '';
+    
+    if (selectedProvider) {
+      const embedKeyInfo = EMBED_PROVIDER_KEYS.find(p => p.name === selectedProvider);
+      const embedKeyInput = embedKeyInfo ? document.getElementById(embedKeyInfo.inputId) : null;
+      return embedKeyInput?.value?.trim() || '';
+    }
+    
+    for (const { name, inputId } of EMBED_PROVIDER_KEYS) {
+      const input = document.getElementById(inputId);
+      if (input?.value?.trim()) {
+        if (this.els.embedProviderSelect) this.els.embedProviderSelect.value = name;
+        return input.value.trim();
+      }
+    }
+    return '';
+  }
+
+  populateEmbedModelSelect(providerKey) {
+    const sel = this.els.embedModelSelect;
+    if (!sel) return;
+    sel.innerHTML = '';
+
+    const embedKeyInfo = EMBED_PROVIDER_KEYS.find(p => p.name === providerKey);
+    const embedKeyInput = embedKeyInfo ? document.getElementById(embedKeyInfo.inputId) : null;
+    const embedKeyValue = embedKeyInput?.value?.trim() || '';
+
+    if (!embedKeyValue) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'Enter API key first...';
+      sel.appendChild(opt);
+      return;
+    }
+
+    const preset = this.embedProviderPresets[providerKey];
+    if (!preset || !preset.models || preset.models.length === 0) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'Custom model...';
+      sel.appendChild(opt);
+      return;
+    }
+
+    preset.models.forEach(model => {
+      const opt = document.createElement('option');
+      opt.value = model;
+      opt.textContent = model;
+      sel.appendChild(opt);
+    });
+
+    const currentModel = this.memoryConfig.embed_model || '';
+    if (currentModel && preset.models.includes(currentModel)) {
+      sel.value = currentModel;
+    } else {
+      sel.value = preset.default_model || preset.models[0];
     }
   }
 
@@ -473,6 +661,60 @@ class OutObotChat {
     } else if (models.length > 0) {
       sel.value = models[0];
     }
+  }
+
+  populateMemoryProviderSelect() {
+    if (!this.els.memoryProvider) return;
+    const sel = this.els.memoryProvider;
+    sel.innerHTML = '';
+
+    const displayNames = {
+      openai: 'OpenAI',
+      anthropic: 'Anthropic',
+      google: 'Google',
+      mistral: 'Mistral AI',
+      ollama: 'Ollama (Local)',
+      minimax: 'MiniMax',
+      glm: 'GLM',
+      glm_coding: 'GLM Coding Plan',
+      kimi: 'Kimi',
+      xiaomi: 'Xiaomi MiMo',
+      xiaomi_token_plan: 'Xiaomi MiMo Token Plan'
+    };
+
+    PROVIDER_KEYS.forEach(({ key, inputId }) => {
+      if (key === 'ollama') {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = displayNames[key] || key;
+        sel.appendChild(opt);
+        return;
+      }
+      const input = document.getElementById(inputId);
+      const apiKey = input?.value?.trim() || '';
+      const config = this.providerConfig[key] || {};
+      if (apiKey || config.api_key) {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = displayNames[key] || key;
+        sel.appendChild(opt);
+      }
+    });
+  }
+
+  updateMemoryModels() {
+    if (!this.els.memoryModel) return;
+    const providerName = this.els.memoryProvider?.value;
+    const sel = this.els.memoryModel;
+    sel.innerHTML = '';
+
+    const models = this.getProviderModels(providerName);
+    models.forEach((m) => {
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = m;
+      sel.appendChild(opt);
+    });
   }
 
   buildSidebarAgents() {
@@ -897,10 +1139,78 @@ class OutObotChat {
   }
 
   openSettings() {
-    this.syncSettingsInputs();
+    this.loadMemoryConfig().then(() => {
+      this.syncSettingsInputs();
+      this.populateEmbedProviderSelect();
+      const ep = this.memoryConfig.embed_provider || '';
+      this.populateEmbedModelSelect(ep);
+    });
     this.populateDefaultProviderSelect();
     this.updateDefaultModels();
+    if (this.els.apiKeysModal) this.els.apiKeysModal.style.display = 'flex';
     this.els.settingsModalsContainer.classList.remove('hidden');
+  }
+
+  openModelSettings() {
+    this.loadMemoryConfig().then(() => {
+      this.syncMemorySettingsInputs();
+    });
+    this.populateMemoryProviderSelect();
+    this.updateMemoryModels();
+    this.populateEmbedProviderSelect();
+    if (this.els.apiKeysModal) this.els.apiKeysModal.style.display = 'none';
+    if (this.els.modelModal) this.els.modelModal.style.display = 'flex';
+    this.els.settingsModalsContainer.classList.remove('hidden');
+  }
+
+  openApiKeysSettings() {
+    this.populateEmbedProviderSelect();
+    const ep = this.memoryConfig.embed_provider || '';
+    this.populateEmbedModelSelect(ep);
+    if (this.els.modelModal) this.els.modelModal.style.display = 'none';
+    if (this.els.apiKeysModal) this.els.apiKeysModal.style.display = 'flex';
+  }
+
+  syncMemorySettingsInputs() {
+    this.populateMemoryProviderSelect();
+
+    const memoryProvider = this.memoryConfig.provider || 'openai';
+    if (this.els.memoryProvider) this.els.memoryProvider.value = memoryProvider;
+
+    this.updateMemoryModels();
+
+    const memoryModel = this.memoryConfig.memory_model || '';
+    if (memoryModel && this.els.memoryModel) {
+      const models = this.getProviderModels(memoryProvider);
+      if (models.includes(memoryModel)) {
+        this.els.memoryModel.value = memoryModel;
+      }
+    }
+
+    this.populateEmbedProviderSelect();
+    const embedProvider = this.memoryConfig.embed_provider || '';
+    if (this.els.embedProviderSelect) this.els.embedProviderSelect.value = embedProvider;
+    
+    EMBED_PROVIDER_KEYS.forEach(({ name, inputId }) => {
+      const input = document.getElementById(inputId);
+      if (input) {
+        if (name === embedProvider) {
+          input.value = this.memoryConfig.embed_api_key || '';
+        } else {
+          input.value = '';
+        }
+      }
+    });
+    
+    this.populateEmbedModelSelect(embedProvider);
+
+    const embedModel = this.memoryConfig.embed_model || '';
+    if (embedModel && this.els.embedModelSelect) {
+      const preset = this.embedProviderPresets[embedProvider];
+      if (preset && preset.models.includes(embedModel)) {
+        this.els.embedModelSelect.value = embedModel;
+      }
+    }
   }
 
   syncSettingsInputs() {
@@ -938,6 +1248,45 @@ class OutObotChat {
       } else {
         discordStatus.textContent = '';
         discordStatus.className = 'key-status';
+      }
+    }
+
+    this.populateEmbedProviderSelect();
+    const embedProvider = this.memoryConfig.embed_provider || '';
+    this.populateEmbedModelSelect(embedProvider);
+
+    const embedUrl = document.getElementById('embedUrlInput');
+    if (embedUrl) {
+      embedUrl.value = this.memoryConfig.embed_api_url || '';
+      embedUrl.readOnly = (embedProvider !== 'custom' && embedProvider !== '');
+    }
+
+    EMBED_PROVIDER_KEYS.forEach(({ name, inputId }) => {
+      const input = document.getElementById(inputId);
+      if (input) {
+        if (name === embedProvider) {
+          input.value = this.memoryConfig.embed_api_key || '';
+        } else {
+          input.value = '';
+        }
+      }
+    });
+
+    const memoryEnabled = document.getElementById('memoryEnabled');
+    if (memoryEnabled) memoryEnabled.value = String(this.memoryConfig.enabled || false);
+
+    this.populateMemoryProviderSelect();
+
+    const memoryProvider = this.memoryConfig.provider || 'openai';
+    if (this.els.memoryProvider) this.els.memoryProvider.value = memoryProvider;
+
+    this.updateMemoryModels();
+
+    const memoryModel = this.memoryConfig.memory_model || '';
+    if (memoryModel && this.els.memoryModel) {
+      const models = this.getProviderModels(memoryProvider);
+      if (models.includes(memoryModel)) {
+        this.els.memoryModel.value = memoryModel;
       }
     }
   }
@@ -1039,6 +1388,25 @@ class OutObotChat {
       await this.loadDiscordConfig();
     } catch (err) {
       console.error('Failed to save Discord config:', err);
+    }
+
+    try {
+      await fetch('/api/memory/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: true,
+          provider: document.getElementById('memoryProvider')?.value || 'openai',
+          memory_model: document.getElementById('memoryModel')?.value || '',
+          embed_provider: this.els.embedProviderSelect?.value || '',
+          embed_api_url: '',
+          embed_api_key: this.getEmbedApiKeyForSave() || '',
+          embed_model: this.els.embedModelSelect?.value || 'text-embedding-3-small'
+        })
+      });
+      await this.loadMemoryConfig();
+    } catch (err) {
+      console.error('Failed to save Memory embed config:', err);
     }
   }
 

@@ -65,7 +65,7 @@ For detailed documentation, see:
 |----------|-------------|
 | [API.md](API.md) | Complete API reference (REST, WebSocket, SSE) |
 | [AGENTS.md](AGENTS.md) | Agent system, roles, temperatures, provider priority |
-| [TOOLS.md](TOOLS.md) | Default tools (search_web, read_file, etc.) |
+| [TOOLS.md](TOOLS.md) | Default tools (read_file, write_file, etc.) |
 | [SESSIONS.md](SESSIONS.md) | Session management and storage |
 | [SKILLS.md](SKILLS.md) | Skills system and sync |
 | [CONFIG.md](CONFIG.md) | Configuration files and providers |

@@ -446,6 +446,10 @@ body {
   color: var(--error);
 }
 
+.log-entry.log-memory {
+  color: #a78bfa;
+}
+
 /* ── Chat Area ──────────────────────────────────────── */
 
 .chat-area {

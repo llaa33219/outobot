@@ -93,6 +93,7 @@ class ExecutionManager:
         sessions_dir: Path,
         transform_fn: Callable[..., dict[str, Any] | None],
         extra_instructions: str | None = None,
+        memory_manager: Any | None = None,
     ) -> Execution:
         existing = self._executions.get(session_id)
         if existing and existing.status == "running":
@@ -131,6 +132,7 @@ class ExecutionManager:
                 sessions_dir=sessions_dir,
                 transform_fn=transform_fn,
                 extra_instructions=extra_instructions,
+                memory_manager=memory_manager,
             )
         )
         self._tasks[session_id] = task
@@ -165,6 +167,7 @@ class ExecutionManager:
         sessions_dir: Path,
         transform_fn: Callable[..., dict[str, Any] | None],
         extra_instructions: str | None = None,
+        memory_manager: Any | None = None,
     ):
         global async_run_stream, Message
         if async_run_stream is None:
@@ -210,6 +213,21 @@ class ExecutionManager:
             pass
 
         try:
+            if extra_instructions:
+                memory_event = {
+                    "type": "memory_context",
+                    "agent_name": execution.agent_name,
+                    "call_id": "",
+                    "data": {
+                        "content": extra_instructions[:500]
+                        + ("..." if len(extra_instructions) > 500 else ""),
+                        "length": len(extra_instructions),
+                    },
+                }
+                execution.events_buffer.append(memory_event)
+                for queue in self._subscribers.get(execution.session_id, []):
+                    await queue.put(memory_event)
+
             async for event in async_run_stream(
                 starting_agents=[agent],
                 message=message,
@@ -259,6 +277,26 @@ class ExecutionManager:
                     )
                     self._persist_execution_state(execution, sessions_dir)
                     self._clear_persisted_state(execution.session_id, sessions_dir)
+
+                    if memory_manager is not None and execution.result:
+                        memory_manager.remember_async(
+                            user_message=message,
+                            assistant_message=execution.result,
+                        )
+                        memory_store_event = {
+                            "type": "memory_store",
+                            "agent_name": execution.agent_name,
+                            "call_id": "",
+                            "data": {
+                                "user_message": message[:200]
+                                + ("..." if len(message) > 200 else ""),
+                                "assistant_message": execution.result[:200]
+                                + ("..." if len(execution.result) > 200 else ""),
+                            },
+                        }
+                        execution.events_buffer.append(memory_store_event)
+                        for queue in self._subscribers.get(execution.session_id, []):
+                            await queue.put(memory_store_event)
 
         except Exception as exc:
             execution.status = "error"

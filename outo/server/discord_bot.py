@@ -92,11 +92,13 @@ class OutobotDiscord:
         agent_manager: Any,
         provider_manager: Any,
         sessions_dir: Path,
+        memory_manager: Any = None,
     ):
         self.token = token
         self.agent_manager = agent_manager
         self.provider_manager = provider_manager
         self.sessions_dir = sessions_dir
+        self.memory_manager = memory_manager
 
         intents = discord.Intents.default()
         intents.message_content = True
@@ -206,7 +208,6 @@ class OutobotDiscord:
     ) -> str:
         from agentouto.message import Message
         from agentouto.streaming import async_run_stream
-        from outo.agents import build_note_extra_instructions
 
         agent_name = agent_name or "outo"
 
@@ -293,7 +294,11 @@ class OutobotDiscord:
                     pass
 
         output = None
-        note_instructions = build_note_extra_instructions()
+        note_instructions = (
+            (await self.memory_manager.get_context(history))
+            if self.memory_manager
+            else ""
+        )
         try:
             async for event in async_run_stream(
                 starting_agents=[agent],
@@ -324,5 +329,10 @@ class OutobotDiscord:
             )
 
         save_session(session_id, session_messages, self.sessions_dir)
+
+        if output and self.memory_manager:
+            self.memory_manager.remember_async(
+                user_message=content, assistant_message=output
+            )
 
         return output if output else "I couldn't generate a response. Please try again."

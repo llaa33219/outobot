@@ -30,7 +30,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 from outo import (
     ProviderManager,
     AgentManager,
+    MemoryManager,
 )
+from outo.tools import set_memory_manager
 from outo.server.execution import ExecutionManager  # pyright: ignore[reportMissingImports]
 from outo.server.discord_bot import OutobotDiscord, load_discord_config  # pyright: ignore[reportMissingImports]
 
@@ -38,7 +40,16 @@ get_skills_manager = import_module("outo.skills").get_skills_manager
 
 
 # Import route creators from the new modular structure
-from outo.server.routes import static, providers, skills, agents, sessions, chat, upload
+from outo.server.routes import (
+    static,
+    providers,
+    skills,
+    agents,
+    sessions,
+    chat,
+    upload,
+    memory,
+)
 
 
 # Global manager instances
@@ -140,6 +151,7 @@ async def lifespan(app: FastAPI):
                 agent_manager=agent_manager,
                 provider_manager=provider_manager,
                 sessions_dir=SESSIONS_DIR,
+                memory_manager=getattr(app.state, "memory_manager", None),
             )
             await discord_bot.start()
         except Exception as e:
@@ -168,6 +180,11 @@ def create_app() -> FastAPI:
 
     # Initialize managers
     provider_manager = ProviderManager(CONFIG_DIR)
+    memory_manager = MemoryManager(
+        config_dir=CONFIG_DIR,
+        provider_manager=provider_manager,
+    )
+    set_memory_manager(memory_manager)
     skills_manager = get_skills_manager(Path(__file__).parent / "skills")
     agent_manager = None  # Will be created in lifespan
     skills_sync_config = _get_skills_sync_config(skills_manager)
@@ -196,6 +213,7 @@ def create_app() -> FastAPI:
     app.state.sessions_dir = SESSIONS_DIR
     app.state.execution_manager = ExecutionManager()
     app.state.execution_manager.initialize(SESSIONS_DIR)
+    app.state.memory_manager = memory_manager
     app.state.upload_dir = UPLOAD_DIR
     app.state.static_dir = static_dir
 
@@ -208,9 +226,10 @@ def create_app() -> FastAPI:
     agents_router = agents.create_agents_routes(app, agent_manager)
     sessions_router = sessions.create_sessions_routes(app, SESSIONS_DIR)
     chat_router = chat.create_chat_routes(
-        app, agent_manager, provider_manager, SESSIONS_DIR
+        app, agent_manager, provider_manager, SESSIONS_DIR, memory_manager
     )
     upload_router = upload.create_upload_routes(app, UPLOAD_DIR)
+    memory_router = memory.create_memory_routes(app, memory_manager)
 
     # Include all routers
     for router in [
@@ -221,6 +240,7 @@ def create_app() -> FastAPI:
         sessions_router,
         chat_router,
         upload_router,
+        memory_router,
     ]:
         app.include_router(router)
 

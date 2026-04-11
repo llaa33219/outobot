@@ -44,6 +44,12 @@ class EventHandlers {
       case 'forward':
         this.handleForward(agent, data);
         break;
+      case 'memory_context':
+        this.handleMemoryContext(agent, cid, data);
+        break;
+      case 'memory_store':
+        this.handleMemoryStore(agent, cid, data);
+        break;
     }
   }
 
@@ -184,6 +190,28 @@ class EventHandlers {
     if (this.chat.isReplaying) {
       this.ui.addUserMessage(data.content || '');
     }
+  }
+
+  handleMemoryContext(agent, cid, data) {
+    this.chat.ensureAgentBubble(agent);
+    this.chat.addLogEntry(
+      '🧠',
+      '<strong>Memory attached</strong>',
+      'log-memory',
+      data.content ? this.ui.truncateText(data.content, 150) : null
+    );
+  }
+
+  handleMemoryStore(agent, cid, data) {
+    const parts = [];
+    if (data.user_message) parts.push('User: ' + this.ui.truncateText(data.user_message, 80));
+    if (data.assistant_message) parts.push('Agent: ' + this.ui.truncateText(data.assistant_message, 80));
+    this.chat.addLogEntry(
+      '💾',
+      '<strong>Memory stored</strong>',
+      'log-memory',
+      parts.length ? parts.join(' | ') : null
+    );
   }
 
   scheduleScroll() {

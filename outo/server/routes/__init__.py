@@ -2,7 +2,7 @@
 OutObot Server Routes - API route modules
 """
 
-from . import static, providers, skills, agents, sessions, chat, upload
+from . import static, providers, skills, agents, sessions, chat, upload, memory
 
 __all__ = [
     "static",
@@ -12,4 +12,5 @@ __all__ = [
     "sessions",
     "chat",
     "upload",
+    "memory",
 ]

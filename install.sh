@@ -208,7 +208,7 @@ setup_venv() {
             if [ "$INSTALLED_VERSION" != "$CURRENT_VERSION" ]; then
                 echo -e "  ${YELLOW}Version update detected: $INSTALLED_VERSION -> $CURRENT_VERSION${NC}"
                 echo -e "  Upgrading packages..."
-                "$OUTOBOT_BIN/pip" install --upgrade agentouto fastapi 'uvicorn[standard]' python-multipart aiohttp pydantic wsproto websockets discord.py
+                "$OUTOBOT_BIN/pip" install --upgrade agentouto fastapi 'uvicorn[standard]' python-multipart aiohttp pydantic wsproto websockets discord.py outomem
             else
                 echo -e "  Already up to date."
             fi
@@ -221,11 +221,11 @@ setup_venv() {
         # Install dependencies (venv includes pip by default in modern Python)
         echo -e "  Installing dependencies..."
         "$OUTOBOT_BIN/pip" install --upgrade pip
-        "$OUTOBOT_BIN/pip" install agentouto
-        "$OUTOBOT_BIN/pip" install fastapi 'uvicorn[standard]' python-multipart
-        "$OUTOBOT_BIN/pip" install aiohttp pydantic
-        "$OUTOBOT_BIN/pip" install wsproto websockets
-        "$OUTOBOT_BIN/pip" install discord.py
+        "$OUTOBOT_BIN/pip" install agentouto outomem
+        "$OUTOBOT_BIN/pip" install fastapi 'uvicorn[standard]' python-multipart outomem
+        "$OUTOBOT_BIN/pip" install aiohttp pydantic outomem
+        "$OUTOBOT_BIN/pip" install wsproto websockets outomem
+        "$OUTOBOT_BIN/pip" install discord.py outomem
     fi
     
     # Save version

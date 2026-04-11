@@ -90,15 +90,6 @@ def create_agents(providers: dict) -> dict:
 
 
 @Tool
-def search_web(
-    query: Annotated[str, "Search keywords or question"],
-    max_results: Annotated[int, "Maximum number of results to return"] = 10,
-) -> str:
-    """Search the web for information."""
-    return f"Web search for: {query} (max {max_results} results)"
-
-
-@Tool
 def read_file(
     path: Annotated[str, "File path to read"],
 ) -> str:
@@ -151,7 +142,6 @@ def search_code(
 
 
 DEFAULT_TOOLS = [
-    search_web,
     read_file,
     write_file,
     run_bash,

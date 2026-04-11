@@ -291,6 +291,133 @@ Discord bot settings are stored separately from `providers.json`.
 - Maintains per-channel sessions
 - Splits responses longer than 2000 characters into multiple messages
 
+## Memory Configuration
+
+Location: `~/.outobot/config/memory.json`
+
+OutObot uses an intelligent memory system powered by **outomem** (Neo4j + LanceDB) for persistent agent memory across conversations.
+
+### Configuration File
+
+```json
+{
+  "enabled": true,
+  "provider": "openai",
+  "memory_model": "",
+  "embed_provider": "openai",
+  "embed_api_url": "https://api.openai.com/v1",
+  "embed_api_key": "sk-...",
+  "embed_model": "text-embedding-3-small",
+  "neo4j_uri": "bolt://localhost:7687",
+  "neo4j_user": "neo4j",
+  "neo4j_password": "outobot-neo4j-pass",
+  "neo4j_container_name": "outobot-neo4j",
+  "neo4j_image": "neo4j:5.23",
+  "db_path": "~/.outobot/config/outomem.lance",
+  "max_tokens": 4096
+}
+```
+
+### Configuration Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| enabled | boolean | true | Enable/disable memory system |
+| provider | string | "openai" | AI provider for memory processing |
+| memory_model | string | "" | Custom model for memory (uses provider default if empty) |
+| embed_provider | string | "" | Embedding provider (openai, google, cohere, voyage, qwen, mistral, custom) |
+| embed_api_url | string | "" | Embedding API URL (auto-set from presets) |
+| embed_api_key | string | "" | Embedding API key |
+| embed_model | string | "text-embedding-3-small" | Embedding model name |
+| neo4j_uri | string | "bolt://localhost:7687" | Neo4j connection URI |
+| neo4j_user | string | "neo4j" | Neo4j username |
+| neo4j_password | string | "" | Neo4j password |
+| neo4j_container_name | string | "outobot-neo4j" | Distrobox container name for Neo4j |
+| neo4j_image | string | "neo4j:5.23" | Neo4j Docker image |
+| db_path | string | "" | LanceDB path (auto-generated if empty) |
+| max_tokens | int | 4096 | Max tokens for memory context |
+
+### Embedding Provider Presets
+
+| Provider | Default URL | Default Model |
+|----------|-------------|---------------|
+| openai | https://api.openai.com/v1 | text-embedding-3-small |
+| google | https://generativelanguage.googleapis.com/v1beta2 | text-embedding-004 |
+| cohere | https://api.cohere.ai/v1 | embed-english-v3.0 |
+| voyage | https://api.voyageai.com/v1 | voyage-4-lite |
+| qwen | https://dashscope.aliyuncs.com/api/v1 | text-embedding-v3 |
+| mistral | https://api.mistral.ai/v1 | mistral-embed |
+| custom | (user-provided) | (user-provided) |
+
+### Neo4j Setup
+
+The memory system uses Neo4j for knowledge graph storage. It's managed automatically via distrobox:
+
+1. **Auto-creation**: On first use, a distrobox container named `outobot-neo4j` is created
+2. **Ports**: Neo4j exposes bolt (7687) and HTTP (7474) ports
+3. **Data**: Stored in `~/.outobot/config/neo4j_data/`
+4. **Default password**: `outobot-neo4j-pass` (change in config)
+
+### Configure via Web UI
+
+1. Open http://localhost:7227
+2. Go to Settings
+3. Open Memory section
+4. Configure embedding provider and API key
+5. Set Neo4j password
+6. Save configuration
+
+### Configure via API
+
+- `GET /api/memory/config`
+- `POST /api/memory/config`
+- `GET /api/memory/health`
+
+### How It Works
+
+1. **Storage**: After each conversation, messages are stored in both LanceDB (vector embeddings) and Neo4j (entities/relationships)
+2. **Retrieval**: Before each response, relevant past context is retrieved via semantic search
+3. **Context Injection**: Retrieved memory is prepended as a system message
+
+### Dependencies
+
+The memory system requires:
+- `outomem` Python library
+- `neo4j` (managed via distrobox container)
+- `lancedb` (vector database)
+
+### Troubleshooting
+
+#### Memory Not Available
+
+**Symptom**: `recall_memory("")` shows "outomem not available"
+
+**Solutions**:
+1. Check if outomem is installed: `pip show outomem`
+2. Verify embedding API key is configured
+3. Check Neo4j is running: `distrobox enter outobot-neo4j -- neo4j status`
+4. View health check: `curl http://localhost:7227/api/memory/health`
+
+#### Neo4j Connection Failed
+
+**Symptom**: Health check shows `"neo4j": {"connected": false}`
+
+**Solutions**:
+1. Check container exists: `distrobox list | grep neo4j`
+2. Start Neo4j: `distrobox enter outobot-neo4j -- neo4j start`
+3. Verify port 7687 is accessible: `nc -zv localhost 7687`
+4. Check password matches config
+
+#### Embedding API Errors
+
+**Symptom**: `"embedding": {"working": false}`
+
+**Solutions**:
+1. Verify embed_api_key is correct
+2. Check embed_api_url matches provider
+3. Ensure model name is valid for provider
+4. Test API key: `curl -H "Authorization: Bearer $KEY" $URL/models`
+
 ## Web UI Configuration
 
 The easiest way to configure OutObot is via the web UI:

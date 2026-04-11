@@ -7,6 +7,7 @@ from .providers import ProviderManager, DEFAULT_PROVIDERS
 from .agents import AgentManager, DEFAULT_AGENTS, AGENT_ROLES
 from .tools import DEFAULT_TOOLS
 from .skills import SkillsManager, get_skills_manager, AGENT_SKILL_PATHS
+from .memory import MemoryManager
 
 __all__ = [
     "ProviderManager",
@@ -17,4 +18,5 @@ __all__ = [
     "SkillsManager",
     "get_skills_manager",
     "AGENT_SKILL_PATHS",
+    "MemoryManager",
 ]

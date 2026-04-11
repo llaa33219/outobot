@@ -212,7 +212,7 @@ Session load/save plus execution state persistence functions:
 
 ### outo/tools.py
 
-- 5 default tools: search_web, read_file, write_file, run_bash, search_code
+- 5 default tools: read_file, write_file, run_bash, search_code, search_memory
 
 ---
 

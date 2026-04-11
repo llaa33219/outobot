@@ -2,6 +2,7 @@
 OutObot Server Routes - Chat endpoints (streaming, regular, websocket)
 """
 
+import asyncio
 import json
 from pathlib import Path
 from datetime import datetime
@@ -20,7 +21,9 @@ from outo.skills import get_skills_manager
 router = APIRouter()
 
 
-def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path):
+def create_chat_routes(
+    app, agent_manager, provider_manager, sessions_dir: Path, memory_manager=None
+):
     """Register chat routes"""
 
     @router.post("/api/chat/stream")
@@ -55,7 +58,6 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
 
         async def event_generator():
             from agentouto.message import Message  # pyright: ignore[reportMissingImports]
-            from outo.agents import build_note_extra_instructions
 
             current_agent_manager = state_agent_manager
             exec_mgr = getattr(req.app.state, "execution_manager", None)
@@ -124,7 +126,9 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                 return
 
             # Start execution via ExecutionManager for independent execution
-            note_instructions = build_note_extra_instructions()
+            note_instructions = (
+                (await memory_manager.get_context(history)) if memory_manager else ""
+            )
             await exec_mgr.start(
                 session_id=session_id,
                 agent=agent,
@@ -137,6 +141,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                 session_messages=session_messages,
                 sessions_dir=sessions_dir,
                 transform_fn=transform_stream_event,
+                memory_manager=memory_manager,
             )
 
             # Subscribe to events for SSE streaming
@@ -161,7 +166,6 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
     async def chat(request: ChatMessage, req: Request):
         from agentouto.message import Message  # pyright: ignore[reportMissingImports]
         from agentouto.streaming import async_run_stream  # pyright: ignore[reportMissingImports]
-        from outo.agents import build_note_extra_instructions
 
         state_agent_manager = getattr(req.app.state, "agent_manager", None)
 
@@ -284,7 +288,9 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
         # Track pending delegations for caller→target mapping
         pending_delegations = {}
         output = None
-        note_instructions = build_note_extra_instructions()
+        note_instructions = (
+            (await memory_manager.get_context(history)) if memory_manager else ""
+        )
 
         async for event in async_run_stream(
             starting_agents=[agent],
@@ -337,12 +343,15 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
             elif event.type == "error":
                 pass
 
-        # Fallback if no output was captured
         if output is None:
             output = ""
 
-        # Save session
         save_session(session_id, session_messages, sessions_dir)
+
+        if output and memory_manager:
+            memory_manager.remember_async(
+                user_message=request.message, assistant_message=output
+            )
 
         return {
             "output": output,
@@ -353,7 +362,6 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
     @router.websocket("/ws/chat")
     async def websocket_chat(ws: WebSocket):
         from agentouto.message import Message  # pyright: ignore[reportMissingImports]
-        from outo.agents import build_note_extra_instructions
 
         await ws.accept()
         closed = False
@@ -536,7 +544,11 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                     continue
 
                 try:
-                    note_instructions = build_note_extra_instructions()
+                    note_instructions = (
+                        (await memory_manager.get_context(history))
+                        if memory_manager
+                        else ""
+                    )
                     await exec_mgr.start(
                         session_id=session_id,
                         agent=agent,
@@ -549,6 +561,7 @@ def create_chat_routes(app, agent_manager, provider_manager, sessions_dir: Path)
                         session_messages=session_messages,
                         sessions_dir=sessions_dir,
                         transform_fn=transform_stream_event,
+                        memory_manager=memory_manager,
                     )
                     await safe_send(
                         {

@@ -21,53 +21,127 @@ OutObot uses a multi-agent architecture where specialized agents collaborate to 
 | **Creativus** | Creative | Creative problem solving and ideation |
 | **Artifex** | Artistic | Artistic and design work |
 
-## Note System
+## Memory System
 
-OutObot agents have a persistent knowledge base at `~/.outobot/note/` for recording and recalling information across sessions.
+OutObot uses an intelligent memory system powered by **outomem** (Neo4j + LanceDB) for persistent agent memory across conversations. The system automatically stores and retrieves relevant context.
 
-### Note Functions (module-level in `outo/agents.py`)
+### Architecture
 
-#### `_load_note_file(filename)`
-
-Loads and validates a note file from `~/.outobot/note/`. Returns `None` if file doesn't exist, is empty, or contains only non-substantive content (headers, HTML comments, blockquotes).
-
-```python
-def _load_note_file(filename: str) -> str | None
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      MemoryManager                          │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
+│  │   outomem   │  │   LanceDB   │  │       Neo4j         │ │
+│  │  (LLM+Emb)  │  │ (Vector DB) │  │ (Knowledge Graph)   │ │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+         │                  │                    │
+         └──────────────────┼────────────────────┘
+                            │
+              ┌─────────────┴─────────────┐
+              │    Memory Context Injection │
+              │  (get_context → system msg) │
+              └───────────────────────────┘
 ```
 
-#### `build_note_context_message()`
+### Key Components
 
-Builds a system message containing `me.md` (agent identity) and `important.md` (user facts), plus a catalog of other note files. Returns empty string if neither file exists.
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `MemoryManager` | `outo/memory.py` | Main memory controller, manages outomem lifecycle |
+| `memory.json` | `~/.outobot/config/` | Memory configuration (provider, Neo4j, embeddings) |
+| `outomem.lance` | `~/.outobot/config/` | LanceDB vector store for semantic search |
+| Neo4j | `localhost:7687` | Knowledge graph for relationship-aware memory |
+
+### How It Works
+
+1. **Storage**: After each conversation, `MemoryManager.remember_async()` stores the exchange in both LanceDB (embeddings) and Neo4j (entities/relationships)
+
+2. **Retrieval**: Before each response, `MemoryManager.get_context()` queries outomem for relevant past context based on conversation history
+
+3. **Context Injection**: Retrieved memory is formatted and prepended as a system message containing:
+   - User identity from `me.md`
+   - Relevant memory context from outomem
+
+4. **Fallback**: If outomem is unavailable, falls back to `recall_memory` tool for session-based search
+
+### Memory Manager Methods
+
+#### `get_context(history)`
+
+Retrieves relevant memory context for the current conversation.
 
 ```python
-def build_note_context_message() -> str
+async def get_context(self, history: list[Any] | None = None) -> str
 ```
 
-This message is automatically prepended to agent history as a system message in all chat endpoints (SSE, WebSocket, non-streaming). It is re-read from disk on every request so agents always have the latest note state.
+- Queries outomem with conversation history
+- Returns formatted context string (user identity + memory)
+- Returns empty string if no relevant context found
 
-#### `get_me_content()`
+#### `remember_async(history | user_message, assistant_message)`
 
-Returns `me.md` content if it exists and has substantive text, `None` otherwise. Used to trigger a first-time setup hint in `build_note_extra_instructions()`.
+Stores conversation in memory (non-blocking).
 
 ```python
-def get_me_content() -> str | None
+def remember_async(
+    self,
+    history: list[Any] | None = None,
+    user_message: str | None = None,
+    assistant_message: str | None = None,
+) -> None
 ```
 
-### Note Files
+#### `is_available`
 
-| File | Auto-attached | Purpose |
-|------|--------------|---------|
-| `me.md` | Yes (every message) | Agent identity: speech style, tone, personality traits |
-| `important.md` | Yes (every message) | Important facts about the user: preferences, workflow, projects |
-| Other `.md` files | Catalog only (read on demand) | Topic-specific notes (e.g., `project-alpha.md`, `api-patterns.md`) |
+Property indicating whether outomem is initialized and ready.
 
-### Note Context Injection
+```python
+@property
+def is_available(self) -> bool
+```
 
-When a chat request is processed:
-1. `build_note_context_message()` reads `me.md` and `important.md` from disk
-2. A system message is prepended to the agent's history at position 0
-3. A catalog of other note files is included for on-demand reading
-4. Applied in `outo/server/execution.py` (WebSocket/SSE) and `outo/server/routes/chat.py` (all endpoints)
+### Configuration
+
+Memory is configured via `~/.outobot/config/memory.json`:
+
+```json
+{
+  "enabled": true,
+  "provider": "openai",
+  "embed_provider": "openai",
+  "embed_api_url": "https://api.openai.com/v1",
+  "embed_api_key": "sk-...",
+  "embed_model": "text-embedding-3-small",
+  "neo4j_uri": "bolt://localhost:7687",
+  "neo4j_user": "neo4j",
+  "neo4j_password": "outobot-neo4j-pass",
+  "db_path": "~/.outobot/config/outomem.lance",
+  "max_tokens": 4096
+}
+```
+
+See [CONFIG.md](CONFIG.md) for full configuration options.
+
+### Agent Instructions
+
+Agents now receive memory context automatically. The agent instructions include:
+
+```
+## Memory System
+
+Your long-term memory is managed by outomem. Use `recall_memory(query)` to search past conversations and context. Memory is stored automatically — focus on answering the user, not on note-taking.
+```
+
+### Note Files (Legacy Support)
+
+`me.md` is still used for agent identity and is included in memory context:
+
+| File | Purpose |
+|------|---------|
+| `me.md` | Agent identity: speech style, tone, personality traits |
+
+Other note files (`important.md`, etc.) are deprecated in favor of outomem but remain accessible via `recall_memory` tool.
 
 ## AgentManager Class
 
@@ -183,42 +257,15 @@ Each agent has specific instructions embedded in `outo/agents.py`. The instructi
 
 Skills are dynamically generated from `~/.outobot/skills/` at agent creation time using `_build_skills_list()`. Each installed skill's name and description (from its `SKILL.md`) is listed in the agent instructions.
 
-### Note System in Instructions
+### Memory System in Instructions
 
-All agents include Note System documentation in their instructions:
-
-```
-## Note System (~/.outobot/note/)
-
-Core Files (auto-attached every message — always up to date):
-- me.md — Your agent identity: speech style, tone, personality traits
-- important.md — Important facts about the user
-
-Categorized Note Files (read on demand):
-- Create topic-specific .md files for information worth remembering
-- Discover available notes: run_bash: ls ~/.outobot/note/
-- Read a specific note: run_bash: cat ~/.outobot/note/<filename>
-
-Rules:
-1. Write to note files WITHOUT being asked — proactively record useful information
-2. When you learn something about the user → immediately update important.md
-3. When the user comments on your style → update me.md
-4. When you research a topic, solve a problem → create/update a categorized note file
-5. Use run_bash to read/write files
-6. Keep notes concise and scannable — bullet points and headers
-7. DO NOT record sensitive data (passwords, API keys, personal secrets)
-```
-
-### First-Time Setup Hint
-
-When `me.md` is empty (detected by `is_me_empty()`), `build_note_extra_instructions()` dynamically injects a first-time setup hint into the agent's extra instructions at message time:
+All agents include Memory System documentation in their instructions:
 
 ```
-## me.md (Agent Identity — MANDATORY)
-**⚠️ FIRST-TIME SETUP:** `me.md` is empty. At the start of this conversation, ask the user about their preferences — speech style (존댓말/반말, formal/casual), preferred response length, language. Then write your findings to `me.md`.
-```
+## Memory System
 
-This hint is evaluated **per-message** (not at agent creation time), so once `me.md` is populated, the hint disappears on the next message — no server restart required.
+Your long-term memory is managed by outomem. Use `recall_memory(query)` to search past conversations and context. Memory is stored automatically — focus on answering the user, not on note-taking.
+```
 
 ### OutObot (Coordinator) — Full Instructions
 
@@ -230,9 +277,8 @@ You are the main coordinator agent. Your role is to:
 ## Available Skills
 {dynamically generated list from _build_skills_list()}
 
-## Note System (~/.outobot/note/)
-{note system instructions as above}
-{first-time setup hint if me.md is empty}
+## Memory System
+Your long-term memory is managed by outomem. Use `recall_memory(query)` to search past conversations and context. Memory is stored automatically — focus on answering the user, not on note-taking.
 
 You can delegate to these specialized agents:
 - peritus: General professional work

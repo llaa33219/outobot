@@ -11,79 +11,48 @@ from pathlib import Path
 from typing import Annotated
 from agentouto import Tool, ToolResult, Attachment
 
-# Sessions directory - configured to ~/.outobot/sessions
 SESSIONS_DIR = Path.home() / ".outobot" / "sessions"
 
+_memory_manager = None
 
-@Tool
-def list_memories() -> str:
-    """List all available conversation memories (sessions)."""
-    if not SESSIONS_DIR.exists():
-        return "No memories found. No sessions directory exists."
 
-    sessions = [f.stem for f in SESSIONS_DIR.glob("*.json")]
-    if not sessions:
-        return "No memories found. No previous conversations saved."
-
-    # Sort by creation time (newest first)
-    sessions.sort(reverse=True)
-
-    result = f"Found {len(sessions)} memories:\n\n"
-    for session in sessions[:20]:  # Show max 20
-        result += f"- {session}\n"
-
-    if len(sessions) > 20:
-        result += f"\n... and {len(sessions) - 20} more"
-
-    return result
+def set_memory_manager(manager):
+    global _memory_manager
+    _memory_manager = manager
 
 
 @Tool
 def recall_memory(
-    session_id: Annotated[
-        str, "The session ID to recall (e.g., session_20260315_143022)"
-    ],
+    query: Annotated[
+        str, "Topic or question to recall. Empty string to check memory status."
+    ] = "",
 ) -> str:
-    """Recall a specific conversation memory by session ID."""
+    """Recall memories. Pass a query for semantic search, or empty string to check status."""
+    if not query:
+        if _memory_manager is not None and _memory_manager.is_available:
+            status = "🧠 outomem is ACTIVE"
+        else:
+            status = "⚠️ outomem not available (fallback to session search)"
+
+        if SESSIONS_DIR.exists():
+            count = len(list(SESSIONS_DIR.glob("*.json")))
+            return f"{status}\n📁 {count} sessions stored"
+        return status
+
+    if _memory_manager is not None and _memory_manager.is_available:
+        try:
+            context = _memory_manager._outomem.get_context(query)
+            if context:
+                return context
+        except Exception:
+            pass
+
     if not SESSIONS_DIR.exists():
-        return "Error: Sessions directory does not exist."
-
-    session_file = SESSIONS_DIR / f"{session_id}.json"
-    if not session_file.exists():
-        available = [f.stem for f in SESSIONS_DIR.glob("*.json")]
-        available_str = ", ".join(available[:10]) if available else "none"
-        return f"Error: Session '{session_id}' not found. Available: {available_str}"
-
-    with open(session_file) as f:
-        data = json.load(f)
-
-    messages = data.get("messages", [])
-    if not messages:
-        return f"Session '{session_id}' is empty."
-
-    result = f"=== Memory: {session_id} ===\n"
-    result += f"Created: {data.get('created_at', 'unknown')}\n\n"
-
-    for msg in messages:
-        sender = msg.get("sender", "unknown")
-        content = msg.get("content", "")
-        timestamp = msg.get("timestamp", "")
-        result += f"[{timestamp}] {sender}: {content}\n\n"
-
-    return result
-
-
-@Tool
-def search_memory(
-    query: Annotated[str, "Search query to find in conversation memories"],
-) -> str:
-    """Search through all conversation memories for a specific query."""
-    if not SESSIONS_DIR.exists():
-        return "Error: Sessions directory does not exist."
+        return "No memories found."
 
     sessions = list(SESSIONS_DIR.glob("*.json"))
     if not sessions:
-        return "No memories found to search."
+        return "No memories found."
 
     query_lower = query.lower()
     results = []
@@ -93,37 +62,24 @@ def search_memory(
             data = json.load(f)
 
         session_id = data.get("session_id", session_file.stem)
-        messages = data.get("messages", [])
-
-        for msg in messages:
+        for msg in data.get("messages", []):
             content = msg.get("content", "").lower()
             if query_lower in content:
                 sender = msg.get("sender", "unknown")
-                timestamp = msg.get("timestamp", "")
-                # Show context around the match
-                result = f"[{session_id}] {sender} at {timestamp}: ...{msg.get('content', '')[:200]}..."
-                results.append(result)
+                results.append(
+                    f"[{session_id}] {sender}: {msg.get('content', '')[:200]}..."
+                )
 
     if not results:
-        return f"No memories found containing '{query}'."
+        return f"No memories found for '{query}'."
 
-    result = f"Found {len(results)} matches for '{query}':\n\n"
-    for r in results[:10]:  # Max 10 results
+    result = f"Found {len(results)} matches:\n\n"
+    for r in results[:10]:
         result += f"{r}\n\n"
-
     if len(results) > 10:
-        result += f"... and {len(results) - 10} more matches"
+        result += f"... and {len(results) - 10} more"
 
     return result
-
-
-@Tool
-def search_web(
-    query: Annotated[str, "Search keywords or question"],
-    max_results: Annotated[int, "Maximum number of results to return"] = 10,
-) -> str:
-    """Search the web for information."""
-    return f"Web search for: {query} (max {max_results} results)"
 
 
 @Tool
@@ -358,10 +314,7 @@ def view_media(
 
 
 DEFAULT_TOOLS = [
-    search_web,
     run_bash,
     view_media,
-    list_memories,
     recall_memory,
-    search_memory,
 ]

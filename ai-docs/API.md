@@ -310,6 +310,136 @@ Get statistics about skill synchronization.
 
 ---
 
+### Memory
+
+Manage memory system configuration and health.
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/memory/config` | GET | Get memory configuration |
+| `/api/memory/config` | POST | Save memory configuration |
+| `/api/memory/embed-providers` | GET | List available embedding providers |
+| `/api/memory/status` | GET | Get memory system status |
+| `/api/memory/health` | GET | Get memory system health check |
+
+#### GET /api/memory/config
+
+Get current memory configuration.
+
+**Response:**
+```json
+{
+  "enabled": true,
+  "provider": "openai",
+  "memory_model": "",
+  "embed_provider": "openai",
+  "embed_api_url": "https://api.openai.com/v1",
+  "embed_api_key": "sk-...",
+  "embed_model": "text-embedding-3-small",
+  "neo4j_uri": "bolt://localhost:7687",
+  "neo4j_user": "neo4j",
+  "neo4j_password": "",
+  "neo4j_container_name": "outobot-neo4j",
+  "neo4j_image": "neo4j:5.23",
+  "db_path": "",
+  "max_tokens": 4096
+}
+```
+
+#### POST /api/memory/config
+
+Save memory configuration.
+
+**Request Body:**
+```json
+{
+  "enabled": true,
+  "provider": "openai",
+  "embed_provider": "openai",
+  "embed_api_url": "https://api.openai.com/v1",
+  "embed_api_key": "sk-...",
+  "embed_model": "text-embedding-3-small",
+  "neo4j_uri": "bolt://localhost:7687",
+  "neo4j_user": "neo4j",
+  "neo4j_password": "outobot-neo4j-pass",
+  "db_path": "~/.outobot/config/outomem.lance"
+}
+```
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "message": "Memory configuration saved. Restart may be required."
+}
+```
+
+#### GET /api/memory/embed-providers
+
+Get list of available embedding provider presets.
+
+**Response:**
+```json
+{
+  "openai": {
+    "name": "OpenAI",
+    "url": "https://api.openai.com/v1",
+    "default_model": "text-embedding-3-small",
+    "models": ["text-embedding-3-small", "text-embedding-3-large", "text-embedding-ada-002"]
+  },
+  "google": {
+    "name": "Google",
+    "url": "https://generativelanguage.googleapis.com/v1beta2",
+    "default_model": "text-embedding-004",
+    "models": ["text-embedding-005", "text-embedding-004"]
+  },
+  "cohere": { ... },
+  "voyage": { ... },
+  "qwen": { ... },
+  "mistral": { ... },
+  "custom": { ... }
+}
+```
+
+#### GET /api/memory/status
+
+Get memory system availability status.
+
+**Response:**
+```json
+{
+  "available": true,
+  "config_loaded": true
+}
+```
+
+#### GET /api/memory/health
+
+Get detailed health check of memory system components.
+
+**Response (healthy):**
+```json
+{
+  "healthy": true,
+  "lancedb": {"connected": true},
+  "neo4j": {"connected": true},
+  "embedding": {"working": true}
+}
+```
+
+**Response (unhealthy):**
+```json
+{
+  "healthy": false,
+  "reason": "Neo4j connection failed",
+  "lancedb": {"connected": true},
+  "neo4j": {"connected": false},
+  "embedding": {"working": true}
+}
+```
+
+---
+
 ### Agents
 
 Manage and list agents.

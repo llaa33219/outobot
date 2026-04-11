@@ -4,82 +4,9 @@ Documentation for the default tools available to all agents.
 
 ## Overview
 
-All OutObot agents have access to a set of default tools for interacting with the filesystem, running commands, and searching for information.
+All OutObot agents have access to a set of default tools for executing commands, viewing media, and searching memories.
 
 ## Available Tools
-
-### search_web
-
-Search the web for information.
-
-```python
-@Tool
-def search_web(
-    query: Annotated[str, "Search keywords or question"],
-    max_results: Annotated[int, "Maximum number of results to return"] = 10,
-) -> str:
-```
-
-**Parameters:**
-- `query` (string): Search keywords or question
-- `max_results` (int): Maximum number of results (default: 10)
-
-**Returns:** Web search results as string
-
-**Example:**
-```python
-result = search_web("Python async best practices", max_results=5)
-```
-
----
-
-### read_file
-
-Read contents of a file.
-
-```python
-@Tool
-def read_file(
-    path: Annotated[str, "File path to read"],
-) -> str:
-```
-
-**Parameters:**
-- `path` (string): Absolute or relative file path
-
-**Returns:** File contents as string
-
-**Example:**
-```python
-content = read_file("/home/user/project/README.md")
-```
-
----
-
-### write_file
-
-Write content to a file.
-
-```python
-@Tool
-def write_file(
-    path: Annotated[str, "File path to write"],
-    content: Annotated[str, "Content to write"],
-) -> str:
-```
-
-**Parameters:**
-- `path` (string): File path to write
-- `content` (string): Content to write
-
-**Returns:** Confirmation message
-
-**Example:**
-```python
-result = write_file("/home/user/project/test.py", "print('Hello')")
-```
-
----
 
 ### run_bash
 
@@ -102,34 +29,6 @@ def run_bash(
 **Example:**
 ```python
 output = run_bash("ls -la", timeout=30)
-```
-
----
-
-### search_code
-
-Search for code patterns in files.
-
-```python
-@Tool
-def search_code(
-    query: Annotated[str, "Code pattern to search for"],
-    path: Annotated[str, "Directory path to search"] = ".",
-    file_pattern: Annotated[str, "File pattern (e.g., *.py)"] = "*",
-) -> str:
-```
-
-**Parameters:**
-- `query` (string): Code pattern to search for
-- `path` (string): Directory path to search (default: current directory)
-- `file_pattern` (string): File pattern glob (default: * - all files)
-
-**Returns:** List of matching file paths
-
-**Example:**
-```python
-# Find all Python files containing "async def"
-results = search_code("async def", path="/home/user/project", file_pattern="*.py")
 ```
 
 ---
@@ -171,97 +70,45 @@ result = view_media("/home/luke/.outobot/uploads/image.png")
 
 ---
 
-### list_memories
-
-List all available conversation memories (sessions). This allows agents to see what previous conversations are stored.
-
-```python
-@Tool
-def list_memories() -> str:
-```
-
-**Returns:** List of available session IDs, sorted by creation time (newest first). Shows up to 20 sessions.
-
-**Example:**
-```python
-result = list_memories()
-# Returns: "Found 5 memories:
-#
-# - session_20260317_231312
-# - session_20260317_231156
-# - ..."
-```
-
-**Storage Location:** `~/.outobot/sessions/`
-
----
-
 ### recall_memory
 
-Recall a specific conversation memory by session ID.
+Recall memories using semantic search. Queries outomem for relevant past context, with fallback to session-based search.
 
 ```python
 @Tool
 def recall_memory(
-    session_id: Annotated[str, "The session ID to recall"],
+    query: Annotated[
+        str, "Topic or question to recall. Empty string to check memory status."
+    ] = "",
 ) -> str:
 ```
 
 **Parameters:**
-- `session_id` (string): The session ID (e.g., "session_20260315_143022")
+- `query` (string): Topic or question to search for. Pass empty string to check memory system status.
 
-**Returns:** Full conversation content including:
-- Session ID and creation time
-- All messages with sender, content, and timestamp
+**Returns:** 
+- With query: Relevant memory context from outomem, or matching session excerpts
+- Without query: Memory system status (outomem availability, session count)
 
-**Example:**
-```python
-result = recall_memory("session_20260317_231156")
-# Returns: "=== Memory: session_20260317_231156 ===
-# Created: 2026-03-17T23:11:56.123456
-#
-# [2026-03-17T23:11:56] You: 너 스킬 뭐 쓸 수 있어?
-#
-# [2026-03-17T23:12:01] outo: 저는 outo입니다..."
-```
-
-**Error Handling:**
-- Returns error if session not found
-- Lists available sessions in error message
-
----
-
-### search_memory
-
-Search through all conversation memories for a specific query.
-
-```python
-@Tool
-def search_memory(
-    query: Annotated[str, "Search query to find in conversation memories"],
-) -> str:
-```
-
-**Parameters:**
-- `query` (string): Search text to find in all conversations
-
-**Returns:** List of matching messages with:
-- Session ID
-- Sender
-- Timestamp
-- Message content (truncated to 200 chars)
+**Behavior:**
+1. If query is empty: Returns memory system status
+2. If outomem is available: Performs semantic search via outomem
+3. Fallback: Searches session files for text matches
 
 **Example:**
 ```python
-result = search_memory("Python")
-# Returns: "Found 3 matches for 'Python':
-#
-# [session_20260317_231156] outo at 2026-03-17T23:12:01: ...Python async best practices...
-#
-# [session_20260317_230045] You at 2026-03-17T23:00:45: ...Python로 코드 작성해줘..."
+# Check memory status
+status = recall_memory("")
+# Returns: "🧠 outomem is ACTIVE\n📁 15 sessions stored"
+
+# Search for context
+context = recall_memory("user's preferred programming language")
+# Returns relevant memory context from past conversations
 ```
 
-**Note:** Search is case-insensitive and searches both user and agent messages.
+**Storage Locations:**
+- outomem: `~/.outobot/config/outomem.lance` (LanceDB) + Neo4j
+- Fallback sessions: `~/.outobot/sessions/`
 
 ---
 
@@ -332,15 +179,9 @@ Tools are defined in `outo/tools.py`:
 
 ```python
 DEFAULT_TOOLS = [
-    search_web,
-    read_file,
-    write_file,
     run_bash,
-    search_code,
     view_media,
-    list_memories,
     recall_memory,
-    search_memory,
 ]
 ```
 
@@ -368,7 +209,6 @@ Add to DEFAULT_TOOLS list:
 
 ```python
 DEFAULT_TOOLS = [
-    search_web,
     read_file,
     write_file,
     run_bash,
