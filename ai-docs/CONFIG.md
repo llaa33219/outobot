@@ -308,11 +308,11 @@ OutObot uses an intelligent memory system powered by **outomem** (Neo4j + LanceD
   "embed_api_url": "https://api.openai.com/v1",
   "embed_api_key": "sk-...",
   "embed_model": "text-embedding-3-small",
-  "neo4j_uri": "bolt://localhost:7687",
+  "neo4j_uri": "bolt://localhost:17241",
   "neo4j_user": "neo4j",
   "neo4j_password": "outobot-neo4j-pass",
   "neo4j_container_name": "outobot-neo4j",
-  "neo4j_image": "neo4j:5.23",
+  "neo4j_image": "neo4j:latest",
   "db_path": "~/.outobot/config/outomem.lance",
   "max_tokens": 4096
 }
@@ -329,11 +329,11 @@ OutObot uses an intelligent memory system powered by **outomem** (Neo4j + LanceD
 | embed_api_url | string | "" | Embedding API URL (auto-set from presets) |
 | embed_api_key | string | "" | Embedding API key |
 | embed_model | string | "text-embedding-3-small" | Embedding model name |
-| neo4j_uri | string | "bolt://localhost:7687" | Neo4j connection URI |
+| neo4j_uri | string | "bolt://localhost:17241" | Neo4j connection URI |
 | neo4j_user | string | "neo4j" | Neo4j username |
 | neo4j_password | string | "" | Neo4j password |
 | neo4j_container_name | string | "outobot-neo4j" | Distrobox container name for Neo4j |
-| neo4j_image | string | "neo4j:5.23" | Neo4j Docker image |
+| neo4j_image | string | "neo4j:latest" | Neo4j Docker image |
 | db_path | string | "" | LanceDB path (auto-generated if empty) |
 | max_tokens | int | 4096 | Max tokens for memory context |
 
@@ -354,7 +354,7 @@ OutObot uses an intelligent memory system powered by **outomem** (Neo4j + LanceD
 The memory system uses Neo4j for knowledge graph storage. It's managed automatically via distrobox:
 
 1. **Auto-creation**: On first use, a distrobox container named `outobot-neo4j` is created
-2. **Ports**: Neo4j exposes bolt (7687) and HTTP (7474) ports
+2. **Ports**: Neo4j exposes bolt (17241) and HTTP (17242) ports
 3. **Data**: Stored in `~/.outobot/config/neo4j_data/`
 4. **Default password**: `outobot-neo4j-pass` (change in config)
 
@@ -405,7 +405,7 @@ The memory system requires:
 **Solutions**:
 1. Check container exists: `distrobox list | grep neo4j`
 2. Start Neo4j: `distrobox enter outobot-neo4j -- neo4j start`
-3. Verify port 7687 is accessible: `nc -zv localhost 7687`
+3. Verify port 17241 is accessible: `nc -zv localhost 17241`
 4. Check password matches config
 
 #### Embedding API Errors

@@ -13,19 +13,18 @@ NC='\033[0m'
 
 OUTOBOT_DIR="$HOME/.outobot"
 SYSTEMD_SERVICE="$HOME/.config/systemd/user/outo.service"
+NEO4J_SERVICE="$HOME/.config/systemd/user/neo4j-outobot.service"
 
 echo -e "${RED}========================================${NC}"
 echo -e "${RED}  OutObot Uninstallation${NC}"
 echo -e "${RED}========================================${NC}"
 echo ""
 
-# Check if installed
 if [ ! -d "$OUTOBOT_DIR" ]; then
     echo -e "${YELLOW}OutObot is not installed. Nothing to do.${NC}"
     exit 0
 fi
 
-# Check for non-interactive mode (for scripted use)
 NON_INTERACTIVE=false
 FORCE_REMOVE=false
 
@@ -52,6 +51,9 @@ if [ "$FORCE_REMOVE" = false ] && [ "$NON_INTERACTIVE" = false ]; then
     echo -e "${YELLOW}This will remove:${NC}"
     echo "  - $OUTOBOT_DIR (all data including sessions, config, logs)"
     echo "  - $SYSTEMD_SERVICE (if exists)"
+    echo "  - $NEO4J_SERVICE (if exists)"
+    echo "  - Neo4j distrobox container (outobot-neo4j)"
+    echo "  - Skills distrobox container (arch-outobot)"
     echo "  - Any symlinks to skills directories"
     echo ""
 
@@ -67,39 +69,67 @@ elif [ "$FORCE_REMOVE" = false ]; then
 fi
 
 echo ""
-echo -e "${YELLOW}[1/5] Stopping OutObot service...${NC}"
+echo -e "${YELLOW}[1/6] Stopping OutObot service...${NC}"
 systemctl --user stop outo.service 2>/dev/null || true
 echo -e "  Service stopped."
 
-echo -e "${YELLOW}[2/5] Removing OutObot directory...${NC}"
+echo -e "${YELLOW}[2/6] Stopping Neo4j service...${NC}"
+systemctl --user stop neo4j-outobot.service 2>/dev/null || true
+echo -e "  Neo4j service stopped."
+
+echo -e "${YELLOW}[3/6] Removing OutObot directory...${NC}"
 if [ -d "$OUTOBOT_DIR" ]; then
     rm -rf "$OUTOBOT_DIR"
     echo -e "  Removed: $OUTOBOT_DIR"
 fi
 
-echo -e "${YELLOW}[3/5] Removing systemd service...${NC}"
+echo -e "${YELLOW}[4/6] Removing systemd services...${NC}"
 if [ -f "$SYSTEMD_SERVICE" ]; then
     systemctl --user disable outo.service 2>/dev/null || true
     rm -f "$SYSTEMD_SERVICE"
     echo -e "  Removed: $SYSTEMD_SERVICE"
 fi
+if [ -f "$NEO4J_SERVICE" ]; then
+    systemctl --user disable neo4j-outobot.service 2>/dev/null || true
+    rm -f "$NEO4J_SERVICE"
+    echo -e "  Removed: $NEO4J_SERVICE"
+fi
+systemctl --user daemon-reload 2>/dev/null || true
 
-echo -e "${YELLOW}[4/5] Removing distrobox container...${NC}"
-CONTAINER_NAME="arch-outobot"
-if command -v distrobox &> /dev/null; then
-    if distrobox list 2>/dev/null | grep -q "$CONTAINER_NAME"; then
-        distrobox stop "$CONTAINER_NAME" 2>/dev/null || true
-        distrobox rm "$CONTAINER_NAME" 2>/dev/null || true
-        echo -e "  Removed container: $CONTAINER_NAME"
-    else
-        echo -e "  No container found."
-    fi
-else
-    echo -e "  distrobox not available, skipping."
+echo -e "${YELLOW}[5/6] Removing containers...${NC}"
+
+CONTAINER_CMD=""
+if command -v podman &> /dev/null; then
+    CONTAINER_CMD="podman"
+elif command -v docker &> /dev/null; then
+    CONTAINER_CMD="docker"
 fi
 
-echo -e "${YELLOW}[5/5] Removing skill symlinks and cleaning up...${NC}"
-# Remove any symlinks in ~/.claude/skills/ that point to ~/.outobot/skills
+if [ -n "$CONTAINER_CMD" ]; then
+    if $CONTAINER_CMD ps -a --format "{{.Names}}" 2>/dev/null | grep -q "^outobot-neo4j$"; then
+        echo -e "  Stopping and removing Neo4j container..."
+        $CONTAINER_CMD stop outobot-neo4j 2>/dev/null || true
+        $CONTAINER_CMD rm outobot-neo4j 2>/dev/null || true
+        echo -e "  Removed container: outobot-neo4j"
+    else
+        echo -e "  No Neo4j container found."
+    fi
+else
+    echo -e "  Neither podman nor docker available, skipping."
+fi
+
+if command -v distrobox &> /dev/null; then
+    if distrobox list 2>/dev/null | grep -q "arch-outobot"; then
+        echo -e "  Stopping and removing skills container..."
+        distrobox stop arch-outobot 2>/dev/null || true
+        distrobox rm arch-outobot 2>/dev/null || true
+        echo -e "  Removed container: arch-outobot"
+    else
+        echo -e "  No skills container found."
+    fi
+fi
+
+echo -e "${YELLOW}[6/6] Removing skill symlinks and cleaning up...${NC}"
 if [ -d "$HOME/.claude/skills" ]; then
     for link in "$HOME/.claude/skills"/*; do
         if [ -L "$link" ]; then

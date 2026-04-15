@@ -5,12 +5,14 @@ OutObot Server Routes - Memory configuration
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from outo.memory import EMBED_MODEL_DIMENSIONS
+
 router = APIRouter()
 
 EMBED_PROVIDER_PRESETS = {
     "openai": {
         "name": "OpenAI",
-        "url": "https://api.openai.com/v1",
+        "url": "https://api.openai.com/v1/embeddings",
         "default_model": "text-embedding-3-small",
         "models": [
             "text-embedding-3-small",
@@ -20,17 +22,17 @@ EMBED_PROVIDER_PRESETS = {
     },
     "google": {
         "name": "Google",
-        "url": "https://generativelanguage.googleapis.com/v1beta2",
-        "default_model": "text-embedding-004",
+        "url": "https://generativelanguage.googleapis.com/v1beta/openai/embeddings",
+        "default_model": "gemini-embedding-001",
         "models": [
-            "text-embedding-005",
-            "text-embedding-004",
+            "gemini-embedding-2-preview",
+            "gemini-embedding-001",
         ],
     },
     "cohere": {
         "name": "Cohere",
-        "url": "https://api.cohere.ai/v1",
-        "default_model": "embed-english-v3.0",
+        "url": "https://api.cohere.ai/compatibility/v1/embeddings",
+        "default_model": "embed-v4.0",
         "models": [
             "embed-v4.0",
             "embed-english-v3.0",
@@ -39,7 +41,7 @@ EMBED_PROVIDER_PRESETS = {
     },
     "voyage": {
         "name": "Voyage AI",
-        "url": "https://api.voyageai.com/v1",
+        "url": "https://api.voyageai.com/v1/embeddings",
         "default_model": "voyage-4-lite",
         "models": [
             "voyage-4-large",
@@ -50,7 +52,7 @@ EMBED_PROVIDER_PRESETS = {
     },
     "qwen": {
         "name": "Qwen (Alibaba)",
-        "url": "https://dashscope.aliyuncs.com/api/v1",
+        "url": "https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings",
         "default_model": "text-embedding-v3",
         "models": [
             "text-embedding-v3",
@@ -59,7 +61,7 @@ EMBED_PROVIDER_PRESETS = {
     },
     "mistral": {
         "name": "Mistral AI",
-        "url": "https://api.mistral.ai/v1",
+        "url": "https://api.mistral.ai/v1/embeddings",
         "default_model": "mistral-embed",
         "models": [
             "mistral-embed",
@@ -81,8 +83,9 @@ class MemoryConfig(BaseModel):
     embed_provider: str = ""
     embed_api_url: str = ""
     embed_api_key: str = ""
-    embed_model: str = "text-embedding-3-small"
-    neo4j_uri: str = "bolt://localhost:7687"
+    embed_model: str = ""
+    embed_dim: int = 1536
+    neo4j_uri: str = "bolt://localhost:17241"
     neo4j_user: str = "neo4j"
     neo4j_password: str = ""
     db_path: str = ""
@@ -101,10 +104,10 @@ def create_memory_routes(app, memory_manager):
             raise HTTPException(
                 status_code=500, detail="Memory manager not initialized"
             )
-        await memory_manager.save_config(config.model_dump())
+        await memory_manager.save_config_only(config.model_dump())
         return {
             "status": "ok",
-            "message": "Memory configuration saved. Restart may be required.",
+            "message": "Memory configuration saved.",
         }
 
     @router.get("/api/memory/embed-providers")
@@ -131,5 +134,27 @@ def create_memory_routes(app, memory_manager):
                 "embedding": {"working": False},
             }
         return await memory_manager.health_check()
+
+    @router.get("/api/memory/embed-dimensions")
+    async def get_embed_dimensions():
+        return EMBED_MODEL_DIMENSIONS
+
+    @router.post("/api/memory/reset")
+    async def reset_memory():
+        if not memory_manager:
+            raise HTTPException(
+                status_code=500, detail="Memory manager not initialized"
+            )
+        await memory_manager.reset_memory()
+        return {"status": "ok", "message": "Memory reset complete."}
+
+    @router.post("/api/memory/migrate")
+    async def migrate_memory():
+        if not memory_manager:
+            raise HTTPException(
+                status_code=500, detail="Memory manager not initialized"
+            )
+        await memory_manager.migrate_memory()
+        return {"status": "ok", "message": "Memory migration complete."}
 
     return router

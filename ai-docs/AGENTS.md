@@ -51,7 +51,7 @@ OutObot uses an intelligent memory system powered by **outomem** (Neo4j + LanceD
 | `MemoryManager` | `outo/memory.py` | Main memory controller, manages outomem lifecycle |
 | `memory.json` | `~/.outobot/config/` | Memory configuration (provider, Neo4j, embeddings) |
 | `outomem.lance` | `~/.outobot/config/` | LanceDB vector store for semantic search |
-| Neo4j | `localhost:7687` | Knowledge graph for relationship-aware memory |
+| Neo4j | `localhost:17241` | Knowledge graph for relationship-aware memory |
 
 ### How It Works
 
@@ -113,7 +113,7 @@ Memory is configured via `~/.outobot/config/memory.json`:
   "embed_api_url": "https://api.openai.com/v1",
   "embed_api_key": "sk-...",
   "embed_model": "text-embedding-3-small",
-  "neo4j_uri": "bolt://localhost:7687",
+  "neo4j_uri": "bolt://localhost:17241",
   "neo4j_user": "neo4j",
   "neo4j_password": "outobot-neo4j-pass",
   "db_path": "~/.outobot/config/outomem.lance",

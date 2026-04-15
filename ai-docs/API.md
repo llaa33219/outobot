@@ -336,11 +336,11 @@ Get current memory configuration.
   "embed_api_url": "https://api.openai.com/v1",
   "embed_api_key": "sk-...",
   "embed_model": "text-embedding-3-small",
-  "neo4j_uri": "bolt://localhost:7687",
+  "neo4j_uri": "bolt://localhost:17241",
   "neo4j_user": "neo4j",
   "neo4j_password": "",
   "neo4j_container_name": "outobot-neo4j",
-  "neo4j_image": "neo4j:5.23",
+  "neo4j_image": "neo4j:latest",
   "db_path": "",
   "max_tokens": 4096
 }
@@ -359,7 +359,7 @@ Save memory configuration.
   "embed_api_url": "https://api.openai.com/v1",
   "embed_api_key": "sk-...",
   "embed_model": "text-embedding-3-small",
-  "neo4j_uri": "bolt://localhost:7687",
+  "neo4j_uri": "bolt://localhost:17241",
   "neo4j_user": "neo4j",
   "neo4j_password": "outobot-neo4j-pass",
   "db_path": "~/.outobot/config/outomem.lance"
