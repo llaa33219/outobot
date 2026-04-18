@@ -72,7 +72,7 @@ result = view_media("/home/luke/.outobot/uploads/image.png")
 
 ### recall_memory
 
-Recall memories using semantic search. Queries outomem for relevant past context, with fallback to session-based search.
+Recall memories using semantic search. Queries outowiki for relevant past context, with fallback to session-based search.
 
 ```python
 @Tool
@@ -87,19 +87,19 @@ def recall_memory(
 - `query` (string): Topic or question to search for. Pass empty string to check memory system status.
 
 **Returns:** 
-- With query: Relevant memory context from outomem, or matching session excerpts
-- Without query: Memory system status (outomem availability, session count)
+- With query: Relevant memory context from outowiki, or matching session excerpts
+- Without query: Memory system status (outowiki availability, session count)
 
 **Behavior:**
 1. If query is empty: Returns memory system status
-2. If outomem is available: Performs semantic search via outomem
+2. If outowiki is available: Performs semantic search via outowiki
 3. Fallback: Searches session files for text matches
 
 **Example:**
 ```python
 # Check memory status
 status = recall_memory("")
-# Returns: "🧠 outomem is ACTIVE\n📁 15 sessions stored"
+# Returns: "🧠 outowiki is ACTIVE\n📁 15 sessions stored"
 
 # Search for context
 context = recall_memory("user's preferred programming language")
@@ -107,7 +107,7 @@ context = recall_memory("user's preferred programming language")
 ```
 
 **Storage Locations:**
-- outomem: `~/.outobot/config/outomem.lance` (LanceDB) + Neo4j
+- outowiki: `~/.outobot/wiki/` (markdown files)
 - Fallback sessions: `~/.outobot/sessions/`
 
 ---

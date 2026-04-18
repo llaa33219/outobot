@@ -13,7 +13,6 @@ NC='\033[0m'
 
 OUTOBOT_DIR="$HOME/.outobot"
 SYSTEMD_SERVICE="$HOME/.config/systemd/user/outo.service"
-NEO4J_SERVICE="$HOME/.config/systemd/user/neo4j-outobot.service"
 
 echo -e "${RED}========================================${NC}"
 echo -e "${RED}  OutObot Uninstallation${NC}"
@@ -51,8 +50,6 @@ if [ "$FORCE_REMOVE" = false ] && [ "$NON_INTERACTIVE" = false ]; then
     echo -e "${YELLOW}This will remove:${NC}"
     echo "  - $OUTOBOT_DIR (all data including sessions, config, logs)"
     echo "  - $SYSTEMD_SERVICE (if exists)"
-    echo "  - $NEO4J_SERVICE (if exists)"
-    echo "  - Neo4j distrobox container (outobot-neo4j)"
     echo "  - Skills distrobox container (arch-outobot)"
     echo "  - Any symlinks to skills directories"
     echo ""
@@ -69,54 +66,25 @@ elif [ "$FORCE_REMOVE" = false ]; then
 fi
 
 echo ""
-echo -e "${YELLOW}[1/6] Stopping OutObot service...${NC}"
+echo -e "${YELLOW}[1/5] Stopping OutObot service...${NC}"
 systemctl --user stop outo.service 2>/dev/null || true
 echo -e "  Service stopped."
 
-echo -e "${YELLOW}[2/6] Stopping Neo4j service...${NC}"
-systemctl --user stop neo4j-outobot.service 2>/dev/null || true
-echo -e "  Neo4j service stopped."
-
-echo -e "${YELLOW}[3/6] Removing OutObot directory...${NC}"
+echo -e "${YELLOW}[2/5] Removing OutObot directory...${NC}"
 if [ -d "$OUTOBOT_DIR" ]; then
     rm -rf "$OUTOBOT_DIR"
     echo -e "  Removed: $OUTOBOT_DIR"
 fi
 
-echo -e "${YELLOW}[4/6] Removing systemd services...${NC}"
+echo -e "${YELLOW}[3/5] Removing systemd services...${NC}"
 if [ -f "$SYSTEMD_SERVICE" ]; then
     systemctl --user disable outo.service 2>/dev/null || true
     rm -f "$SYSTEMD_SERVICE"
     echo -e "  Removed: $SYSTEMD_SERVICE"
 fi
-if [ -f "$NEO4J_SERVICE" ]; then
-    systemctl --user disable neo4j-outobot.service 2>/dev/null || true
-    rm -f "$NEO4J_SERVICE"
-    echo -e "  Removed: $NEO4J_SERVICE"
-fi
 systemctl --user daemon-reload 2>/dev/null || true
 
-echo -e "${YELLOW}[5/6] Removing containers...${NC}"
-
-CONTAINER_CMD=""
-if command -v podman &> /dev/null; then
-    CONTAINER_CMD="podman"
-elif command -v docker &> /dev/null; then
-    CONTAINER_CMD="docker"
-fi
-
-if [ -n "$CONTAINER_CMD" ]; then
-    if $CONTAINER_CMD ps -a --format "{{.Names}}" 2>/dev/null | grep -q "^outobot-neo4j$"; then
-        echo -e "  Stopping and removing Neo4j container..."
-        $CONTAINER_CMD stop outobot-neo4j 2>/dev/null || true
-        $CONTAINER_CMD rm outobot-neo4j 2>/dev/null || true
-        echo -e "  Removed container: outobot-neo4j"
-    else
-        echo -e "  No Neo4j container found."
-    fi
-else
-    echo -e "  Neither podman nor docker available, skipping."
-fi
+echo -e "${YELLOW}[4/5] Removing containers...${NC}"
 
 if command -v distrobox &> /dev/null; then
     if distrobox list 2>/dev/null | grep -q "arch-outobot"; then
@@ -129,7 +97,7 @@ if command -v distrobox &> /dev/null; then
     fi
 fi
 
-echo -e "${YELLOW}[6/6] Removing skill symlinks and cleaning up...${NC}"
+echo -e "${YELLOW}[5/5] Removing skill symlinks and cleaning up...${NC}"
 if [ -d "$HOME/.claude/skills" ]; then
     for link in "$HOME/.claude/skills"/*; do
         if [ -L "$link" ]; then

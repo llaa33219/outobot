@@ -1,14 +1,12 @@
 """
 OutObot Memory Management
-Integrates outomem library with OutObot's note system for persistent agent memory.
-Falls back to file-based notes when outomem is not configured.
+Integrates outowiki library with OutObot's note system for persistent agent memory.
+Falls back to file-based notes when outowiki is not configured.
 """
 
 import asyncio
 import json
 import logging
-import os
-import socket
 import threading
 from pathlib import Path
 from typing import Any
@@ -18,118 +16,14 @@ from outo.agents import get_me_content, NOTE_DIR
 logger = logging.getLogger(__name__)
 
 
-def is_running_in_container() -> bool:
-    """Detect container environment (Docker, Podman, distrobox, LXC)."""
-    if os.path.exists("/.dockerenv"):
-        return True
-
-    if os.environ.get("container") in ("docker", "podman"):
-        return True
-
-    try:
-        with open("/proc/1/cgroup", "r") as f:
-            cgroup_content = f.read()
-            if (
-                "docker" in cgroup_content
-                or "podman" in cgroup_content
-                or "lxc" in cgroup_content
-            ):
-                return True
-    except (FileNotFoundError, PermissionError):
-        pass
-
-    if os.environ.get("DISTROBOX_ENTER") or os.environ.get("CONTAINER_ID"):
-        return True
-
-    if os.path.exists("/run/.containerenv"):
-        return True
-
-    return False
-
-
-def get_host_address() -> str:
-    """Resolve host address for container-to-host service access.
-
-    Tries Podman host.containers.internal, then Docker host.docker.internal,
-    then gateway IP from /proc/net/route, finally 172.17.0.1.
-    """
-    try:
-        result = socket.getaddrinfo("host.containers.internal", None, socket.AF_INET)
-        if result:
-            logger.debug("Memory: Using host.containers.internal")
-            return "host.containers.internal"
-    except socket.gaierror:
-        pass
-
-    try:
-        result = socket.getaddrinfo("host.docker.internal", None, socket.AF_INET)
-        if result:
-            logger.debug("Memory: Using host.docker.internal")
-            return "host.docker.internal"
-    except socket.gaierror:
-        pass
-
-    try:
-        with open("/proc/net/route", "r") as f:
-            for line in f:
-                fields = line.strip().split()
-                if len(fields) >= 3 and fields[1] == "00000000":
-                    gateway_hex = fields[2]
-                    gateway_ip = socket.inet_ntoa(bytes.fromhex(gateway_hex)[::-1])
-                    logger.debug("Memory: Using gateway IP %s", gateway_ip)
-                    return gateway_ip
-    except (FileNotFoundError, PermissionError, ValueError, OSError):
-        pass
-
-    logger.warning("Memory: Could not detect host IP, falling back to 172.17.0.1")
-    return "172.17.0.1"
-
-
 MEMORY_CONFIG_FILENAME = "memory.json"
-
-NEO4J_CONTAINER_NAME = "outobot-neo4j"
-NEO4J_IMAGE = "neo4j:latest"
-NEO4J_DEFAULT_PASSWORD = "outobot-neo4j-pass"
-NEO4J_BOLT_PORT = 17241
-NEO4J_HTTP_PORT = 17242
-
-# Embedding model dimensions (from official docs)
-EMBED_MODEL_DIMENSIONS: dict[str, int] = {
-    "text-embedding-3-small": 1536,
-    "text-embedding-3-large": 3072,
-    "text-embedding-ada-002": 1536,
-    "gemini-embedding-001": 3072,
-    "gemini-embedding-2-preview": 3072,
-    "embed-v4.0": 1536,
-    "embed-english-v3.0": 1024,
-    "embed-multilingual-v3.0": 1024,
-    "voyage-4-lite": 1024,
-    "voyage-4": 1024,
-    "voyage-4-large": 1024,
-    "voyage-code-3": 1024,
-    "text-embedding-v3": 1024,
-    "text-embedding-v2": 1024,
-    "mistral-embed": 1024,
-}
 
 DEFAULT_MEMORY_CONFIG: dict[str, Any] = {
     "enabled": True,
     "provider": "openai",
     "memory_model": "",
-    "embed_provider": "",
-    "embed_api_url": "",
-    "embed_api_key": "",
-    "embed_model": "",
-    "current_embed_model": "",
-    "neo4j_uri": f"bolt://localhost:{NEO4J_BOLT_PORT}",
-    "neo4j_user": "neo4j",
-    "neo4j_password": "",
-    "neo4j_container_name": NEO4J_CONTAINER_NAME,
-    "neo4j_image": NEO4J_IMAGE,
-    "db_path": "",
-    "max_tokens": 4096,
-    "embed_dim": 1536,
-    "embed_model_change_pending": None,
+    "wiki_path": "",
+    "max_results": 10,
 }
 
 
@@ -156,25 +50,10 @@ def save_memory_config(config_dir: Path, config: dict[str, Any]) -> None:
         logger.error("Failed to save memory config: %s", e)
 
 
-def _map_provider_kind(kind: str) -> str:
-    """Map OutObot provider kind to outomem provider name.
-
-    OutObot kinds:  openai_responses, openai, anthropic, google
-    outomem names:  openai-responses, openai, anthropic, google
-    """
-    mapping = {
-        "openai_responses": "openai-responses",
-        "openai": "openai",
-        "anthropic": "anthropic",
-        "google": "google",
-    }
-    return mapping.get(kind, "openai")
-
-
 def _history_to_conversation(
     history: list[Any] | None,
 ) -> list[dict[str, str]]:
-    """Convert agentouto Message history to outomem conversation format.
+    """Convert agentouto Message history to conversation format.
 
     Each Message has: type, sender, receiver, content.
     We map sender='You' or sender='user' to role='user',
@@ -196,8 +75,119 @@ def _history_to_conversation(
     return conversation
 
 
+def _conversation_to_record_content(
+    conversation: list[dict[str, str]] | None,
+) -> str | None:
+    """Convert conversation list to outowiki.record() content string."""
+    if not conversation:
+        return None
+    lines = []
+    for msg in conversation:
+        role = msg.get("role", "unknown")
+        content = msg.get("content", "")
+        if content:
+            lines.append(f"{role}: {content}")
+    if not lines:
+        return None
+    return "\n".join(lines)
+
+
+def _search_result_to_context(result) -> str:
+    """Convert outowiki SearchResult to context string."""
+    if not result or not hasattr(result, "documents"):
+        return ""
+    docs = result.documents
+    if not docs:
+        return ""
+    parts = []
+    for doc in docs:
+        if isinstance(doc, str):
+            content = doc
+        else:
+            content = getattr(doc, "content", "") or ""
+        if content:
+            parts.append(content)
+    return "\n\n---\n\n".join(parts)
+
+
+def _fetch_max_tokens(model: str) -> int:
+    """Fetch max output tokens from context-window API.
+
+    Returns the max output tokens for the given model, or 4000 as fallback.
+    """
+    try:
+        import urllib.request
+        import urllib.parse
+
+        url = f"https://lcw-api.blp.sh/context-window?model={urllib.parse.quote(model)}"
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            if data.get("success") and data.get("data"):
+                max_tokens = data["data"].get("maxOutputTokens")
+                if max_tokens and isinstance(max_tokens, int) and max_tokens > 0:
+                    return max_tokens
+    except Exception as e:
+        logger.warning("Failed to fetch max tokens for '%s': %s", model, e)
+    return 4000  # fallback
+
+
+class _SimpleWikiConfig:
+    """Minimal config object matching outowiki WikiConfig interface."""
+
+    def __init__(
+        self,
+        provider: str,
+        base_url: str,
+        api_key: str,
+        model: str,
+        max_output_tokens: int = 4096,
+        wiki_path: str = "",
+    ) -> None:
+        self.provider = provider
+        self.base_url = base_url
+        self.api_key = api_key
+        self.model = model
+        self.max_output_tokens = max_output_tokens
+        self.wiki_path = wiki_path
+
+
+def _config_to_wiki_config(
+    config: dict[str, Any],
+    provider_manager: Any = None,
+    config_dir: Path | None = None,
+) -> _SimpleWikiConfig:
+    """Build a WikiConfig from the legacy memory config dict."""
+    provider_name = config.get("provider", "")
+    resolved = None
+    if provider_manager:
+        mgr = MemoryManager(
+            config_dir=config_dir or Path("."),
+            provider_manager=provider_manager,
+        )
+        resolved = mgr._resolve_provider(provider_name)
+    if not resolved:
+        raise ValueError(f"Provider '{provider_name}' could not be resolved")
+    kind, base_url, api_key, model = resolved
+    memory_model = config.get("memory_model", "")
+    if memory_model:
+        model = memory_model
+    wiki_path = config.get("wiki_path", "")
+    if not wiki_path and config_dir:
+        wiki_path = str(config_dir / "wiki")
+    max_output_tokens = _fetch_max_tokens(model)
+    return _SimpleWikiConfig(
+        provider=kind,
+        base_url=base_url,
+        api_key=api_key,
+        model=model,
+        max_output_tokens=max_output_tokens,
+        wiki_path=wiki_path,
+    )
+
+
 class MemoryManager:
-    """Manages outomem integration with OutObot's note system."""
+    """Manages outowiki integration with OutObot's note system."""
 
     def __init__(
         self,
@@ -208,219 +198,29 @@ class MemoryManager:
         self._config_dir = config_dir
         self._note_dir = note_dir or NOTE_DIR
         self._provider_manager = provider_manager
-        self._outomem: Any = None
+        self._outowiki: Any = None
         self._initialized = False
         self._init_error: str | None = None
         self._lock = asyncio.Lock()
 
-    async def _ensure_neo4j_running(self) -> bool:
-        """Ensure Neo4j container is running. Returns True if available."""
-        config = load_memory_config(self._config_dir)
-        neo4j_uri = config.get("neo4j_uri", f"bolt://localhost:{NEO4J_BOLT_PORT}")
-        container_name = config.get("neo4j_container_name", NEO4J_CONTAINER_NAME)
-
-        try:
-            port = int(neo4j_uri.split(":")[-1])
-        except (ValueError, IndexError):
-            port = NEO4J_BOLT_PORT
-
-        if is_running_in_container():
-            host = get_host_address()
-            logger.info(
-                "Memory: Running inside container, using %s for Neo4j connection", host
-            )
-        else:
-            host = "localhost"
-
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(2)
-            result = sock.connect_ex((host, port))
-            sock.close()
-            if result == 0:
-                logger.info("Memory: Neo4j already running on %s:%d", host, port)
-                return True
-        except Exception as e:
-            logger.debug("Memory: Socket check failed: %s", e)
-
-        container_cmd = None
-        for cmd in ["podman", "docker"]:
-            check_proc = await asyncio.create_subprocess_exec(
-                "which",
-                cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            await check_proc.communicate()
-            if check_proc.returncode == 0:
-                container_cmd = cmd
-                break
-
-        if container_cmd is None:
-            self._init_error = "neither podman nor docker installed (required for Neo4j container management)"
-            logger.warning("Memory: No container runtime found")
-            return False
-
-        image = config.get("neo4j_image", NEO4J_IMAGE)
-        neo4j_password = config.get("neo4j_password", "") or NEO4J_DEFAULT_PASSWORD
-
-        check_proc = await asyncio.create_subprocess_exec(
-            container_cmd,
-            "ps",
-            "-a",
-            "--format",
-            "{{.Names}}",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await check_proc.communicate()
-        container_exists = container_name.encode() in stdout
-
-        if container_exists:
-            start_proc = await asyncio.create_subprocess_exec(
-                container_cmd,
-                "start",
-                container_name,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            await start_proc.communicate()
-            if start_proc.returncode == 0:
-                logger.info("Memory: Started existing Neo4j container")
-                await asyncio.sleep(5)
-                return True
-
-        logger.info(
-            "Memory: Creating Neo4j container '%s' with image '%s'...",
-            container_name,
-            image,
-        )
-        neo4j_data_dir = self._config_dir / "neo4j_data"
-        neo4j_data_dir.mkdir(parents=True, exist_ok=True)
-
-        create_proc = await asyncio.create_subprocess_exec(
-            container_cmd,
-            "run",
-            "-d",
-            "--name",
-            container_name,
-            "--userns=keep-id",
-            "-e",
-            f"NEO4J_AUTH=neo4j/{neo4j_password}",
-            "-e",
-            'NEO4J_PLUGINS=["apoc"]',
-            "-p",
-            f"{NEO4J_BOLT_PORT}:7687",
-            "-p",
-            f"{NEO4J_HTTP_PORT}:7474",
-            "-v",
-            f"{neo4j_data_dir}:/data:Z",
-            image,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await create_proc.communicate()
-        if create_proc.returncode != 0:
-            error_msg = (
-                stderr.decode().strip() or stdout.decode().strip() or "unknown error"
-            )
-            self._init_error = f"Failed to create Neo4j container '{container_name}' (image={image}): {error_msg}"
-            logger.error("Memory: %s", self._init_error)
-            return False
-
-        logger.info("Memory: Neo4j container created, waiting for ready...")
-        await asyncio.sleep(10)
-        return True
-
-        proc = await asyncio.create_subprocess_exec(
-            "distrobox",
-            "enter",
-            container_name,
-            "--",
-            "neo4j",
-            "status",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await proc.communicate()
-        if proc.returncode == 0:
-            logger.info("Memory: Existing Neo4j container is running")
-            return True
-
-        logger.info(
-            "Memory: Creating Neo4j container '%s' with image '%s'...",
-            container_name,
-            image,
-        )
-        neo4j_data_dir = self._config_dir / "neo4j_data"
-        neo4j_data_dir.mkdir(parents=True, exist_ok=True)
-
-        create_proc = await asyncio.create_subprocess_exec(
-            "distrobox",
-            "create",
-            "--name",
-            container_name,
-            "--image",
-            image,
-            "--volume",
-            f"{neo4j_data_dir}:/data",
-            "--additional-flags",
-            f"-e NEO4J_AUTH=neo4j/{neo4j_password} -p {NEO4J_BOLT_PORT}:7687 -p {NEO4J_HTTP_PORT}:7474",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await create_proc.communicate()
-        if create_proc.returncode != 0:
-            error_msg = (
-                stderr.decode().strip() or stdout.decode().strip() or "unknown error"
-            )
-            self._init_error = f"Failed to create Neo4j container '{container_name}' (image={image}): {error_msg}"
-            logger.error("Memory: %s", self._init_error)
-            return False
-
-        start_proc = await asyncio.create_subprocess_exec(
-            "distrobox",
-            "enter",
-            container_name,
-            "--",
-            "neo4j",
-            "start",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await start_proc.communicate()
-        if start_proc.returncode == 0:
-            logger.info("Memory: Neo4j container started, waiting for ready...")
-            await asyncio.sleep(5)
-            return True
-
-        error_msg = (
-            stderr.decode().strip() or stdout.decode().strip() or "unknown error"
-        )
-        self._init_error = (
-            f"Failed to start Neo4j in container '{container_name}': {error_msg}"
-        )
-        logger.error("Memory: %s", self._init_error)
-        return False
-
     async def _try_initialize(self) -> bool:
         if self._initialized:
-            return self._outomem is not None
+            return self._outowiki is not None
 
         async with self._lock:
             if self._initialized:
-                return self._outomem is not None
+                return self._outowiki is not None
 
             try:
-                from outomem import Outomem
+                from outowiki import OutoWiki, WikiConfig
             except ImportError as e:
-                self._init_error = f"outomem library not installed: {e}"
-                logger.warning("Memory: outomem import failed - %s", e)
+                self._init_error = f"outowiki library not installed: {e}"
+                logger.warning("Memory: outowiki import failed - %s", e)
                 self._initialized = True
                 return False
             except Exception as e:
-                self._init_error = f"outomem import error: {type(e).__name__}: {e}"
-                logger.warning("Memory: outomem import unexpected error - %s", e)
+                self._init_error = f"outowiki import error: {type(e).__name__}: {e}"
+                logger.warning("Memory: outowiki import unexpected error - %s", e)
                 self._initialized = True
                 return False
 
@@ -432,98 +232,6 @@ class MemoryManager:
                 logger.info("Memory: disabled in config")
                 self._initialized = True
                 return False
-
-            embed_provider = config.get("embed_provider", "")
-            embed_api_url = config.get("embed_api_url", "")
-            embed_api_key = config.get("embed_api_key", "")
-            embed_model = config.get("embed_model", "")
-
-            if not embed_provider:
-                self._init_error = "no embedding provider configured (memory.json: embed_provider is empty)"
-                logger.warning("Memory: no embed provider configured")
-                self._initialized = True
-                return False
-
-            if not embed_model:
-                self._init_error = (
-                    "no embedding model configured (memory.json: embed_model is empty)"
-                )
-                logger.warning("Memory: no embed model configured")
-                self._initialized = True
-                return False
-
-            current_embed_model = config.get("current_embed_model", "")
-
-            if current_embed_model and current_embed_model != embed_model:
-                if not config.get("embed_model_change_pending"):
-                    pending = {
-                        "old_model": current_embed_model,
-                        "new_model": embed_model,
-                        "old_dim": EMBED_MODEL_DIMENSIONS.get(
-                            current_embed_model, 1536
-                        ),
-                        "new_dim": EMBED_MODEL_DIMENSIONS.get(embed_model, 1536),
-                    }
-                    save_memory_config(
-                        self._config_dir,
-                        {**config, "embed_model_change_pending": pending},
-                    )
-                    self._init_error = (
-                        f"embedding model changed: '{current_embed_model}' → '{embed_model}'. "
-                        f"Choose: reset (DELETE all memory), migrate (re-embed), or cancel."
-                    )
-                    logger.warning("Memory: %s", self._init_error)
-                    self._initialized = True
-                    return False
-
-                change = config.get("embed_model_change_pending", {})
-                if change.get("action") == "cancel":
-                    save_memory_config(
-                        self._config_dir,
-                        {
-                            **config,
-                            "embed_model": current_embed_model,
-                            "embed_model_change_pending": None,
-                        },
-                    )
-                    logger.info(
-                        "Memory: embed model change cancelled, reverted to %s",
-                        current_embed_model,
-                    )
-                    embed_model = current_embed_model
-
-                elif change.get("action") == "reset":
-                    save_memory_config(
-                        self._config_dir,
-                        {
-                            **config,
-                            "current_embed_model": embed_model,
-                            "embed_model_change_pending": None,
-                        },
-                    )
-                    lance_dir = Path(
-                        config.get("db_path", "")
-                        or str(self._config_dir / "outomem.lance")
-                    )
-                    if lance_dir.exists():
-                        import shutil
-
-                        shutil.rmtree(lance_dir)
-                        logger.info("Memory: LanceDB data cleared (%s)", lance_dir)
-
-                elif change.get("action") == "migrate":
-                    save_memory_config(
-                        self._config_dir,
-                        {
-                            **config,
-                            "current_embed_model": embed_model,
-                            "embed_model_change_pending": None,
-                        },
-                    )
-                    logger.info(
-                        "Memory: will migrate data with re-embedding (model=%s)",
-                        embed_model,
-                    )
 
             provider_name = config.get("provider", "")
             if not provider_name:
@@ -541,143 +249,48 @@ class MemoryManager:
                 self._initialized = True
                 return False
 
-            outomem_provider, base_url, api_key, model = resolved
+            kind, base_url, api_key, model = resolved
 
             memory_model = config.get("memory_model", "")
             if memory_model:
                 model = memory_model
 
-            embed_provider = config.get("embed_provider", "")
-            embed_api_url = config.get("embed_api_url", "")
-            embed_api_key = config.get("embed_api_key", "")
-            embed_model = config.get("embed_model", "text-embedding-3-small")
+            wiki_path = config.get("wiki_path", "")
+            if not wiki_path:
+                wiki_path = str(self._config_dir / "wiki")
 
-            if embed_provider and not embed_api_url:
-                from outo.server.routes.memory import EMBED_PROVIDER_PRESETS
-
-                preset = EMBED_PROVIDER_PRESETS.get(embed_provider, {})
-                embed_api_url = preset.get("url", "")
-
-            if not embed_api_url:
-                self._init_error = f"embedding API URL not configured (memory.json: embed_api_url is empty, embed_provider={embed_provider})"
-                logger.warning("Memory: embedding API URL missing")
-                self._initialized = True
-                return False
-
-            if not embed_api_key:
-                self._init_error = f"embedding API key not configured (memory.json: embed_api_key is empty, embed_provider={embed_provider})"
-                logger.warning("Memory: embedding API key missing")
-                self._initialized = True
-                return False
-
-            neo4j_uri = config.get("neo4j_uri", f"bolt://localhost:{NEO4J_BOLT_PORT}")
-            neo4j_available = await self._ensure_neo4j_running()
-            if not neo4j_available:
-                self._init_error = f"Neo4j is not available (tried {neo4j_uri}, container={config.get('neo4j_container_name', NEO4J_CONTAINER_NAME)})"
-                logger.warning("Memory: Neo4j not reachable at %s", neo4j_uri)
-                self._initialized = True
-                return False
-
-            if is_running_in_container():
-                try:
-                    port = int(neo4j_uri.split(":")[-1])
-                except (ValueError, IndexError):
-                    port = NEO4J_BOLT_PORT
-                sock_check = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock_check.settimeout(2)
-                localhost_works = sock_check.connect_ex(("localhost", port)) == 0
-                sock_check.close()
-                if not localhost_works:
-                    host = get_host_address()
-                    neo4j_uri = f"bolt://{host}:{port}"
-                    logger.info(
-                        "Memory: Container detected, localhost unreachable, using %s",
-                        neo4j_uri,
-                    )
-                else:
-                    logger.info(
-                        "Memory: Container detected but localhost reachable, keeping %s",
-                        neo4j_uri,
-                    )
-
-            neo4j_user = config.get("neo4j_user", "neo4j")
-            neo4j_password = config.get("neo4j_password", "") or NEO4J_DEFAULT_PASSWORD
-
-            db_path = config.get("db_path", "")
-            if not db_path:
-                db_path = str(self._config_dir / "outomem.lance")
-
-            embed_dim = EMBED_MODEL_DIMENSIONS.get(embed_model, 1536)
-            need_migrate = (
-                config.get("embed_model_change_pending", {}).get("action") == "migrate"
-            )
-
-            style_path = str(self._note_dir / "me.md")
+            max_output_tokens = _fetch_max_tokens(model)
 
             try:
-                self._outomem = Outomem(
-                    provider=outomem_provider,
+                wiki_config = WikiConfig(
+                    provider=kind,
                     base_url=base_url,
                     api_key=api_key,
                     model=model,
-                    embed_api_url=embed_api_url,
-                    embed_api_key=embed_api_key,
-                    embed_model=embed_model,
-                    embed_dim=embed_dim,
-                    neo4j_uri=neo4j_uri,
-                    neo4j_user=neo4j_user,
-                    neo4j_password=neo4j_password,
-                    db_path=db_path,
-                    style_path=style_path,
+                    max_output_tokens=max_output_tokens,
+                    wiki_path=wiki_path,
                 )
-
-                if need_migrate:
-                    backup_path = str(self._config_dir / "_migrate_backup.json")
-                    try:
-                        logger.info(
-                            "Memory: exporting backup for migration (%s → %s)",
-                            embed_model,
-                            embed_model,
-                        )
-                        self._outomem.export_backup(backup_path)
-                        lance_dir = Path(db_path)
-                        if lance_dir.exists():
-                            import shutil
-
-                            shutil.rmtree(lance_dir)
-                        self._outomem.import_backup(backup_path, reembed=True)
-                        Path(backup_path).unlink(missing_ok=True)
-                        logger.info("Memory: migration completed successfully")
-                    except Exception as migrate_err:
-                        logger.error("Memory: migration failed: %s", migrate_err)
-                        self._init_error = f"migration failed: {migrate_err}"
-                        self._outomem = None
-                        self._initialized = True
-                        return False
-
+                self._outowiki = OutoWiki(wiki_config)
                 self._init_error = None
                 logger.info(
-                    "Memory: outomem initialized (provider=%s, neo4j=%s, embed=%s/%d)",
-                    outomem_provider,
-                    neo4j_uri,
-                    embed_model,
-                    embed_dim,
+                    "Memory: outowiki initialized (provider=%s, wiki_path=%s)",
+                    kind,
+                    wiki_path,
                 )
             except Exception as e:
-                self._outomem = None
+                self._outowiki = None
                 self._init_error = (
-                    f"outomem initialization failed: {type(e).__name__}: {e}"
+                    f"outowiki initialization failed: {type(e).__name__}: {e}"
                 )
                 logger.error(
-                    "Memory: outomem init failed - %s: %s", type(e).__name__, e
+                    "Memory: outowiki init failed - %s: %s", type(e).__name__, e
                 )
 
             self._initialized = True
-            return self._outomem is not None
+            return self._outowiki is not None
 
     def _resolve_provider(self, provider_name: str) -> tuple[str, str, str, str] | None:
         if not self._provider_manager:
-            logger.debug("No provider_manager available for memory resolution")
             return None
 
         provider = self._provider_manager.get_provider(provider_name)
@@ -685,7 +298,6 @@ class MemoryManager:
             return None
 
         kind = getattr(provider, "kind", "openai")
-        outomem_provider = _map_provider_kind(kind)
         base_url = getattr(provider, "base_url", "")
         api_key = getattr(provider, "api_key", "")
 
@@ -696,36 +308,45 @@ class MemoryManager:
         if not api_key:
             return None
 
-        return (outomem_provider, base_url, api_key, model)
+        return (kind, base_url, api_key, model)
 
     async def get_context(self, history: list[Any] | None = None) -> str:
         me_content = get_me_content()
-        outomem_context = ""
-        if await self._try_initialize() and self._outomem is not None:
+        wiki_context = ""
+        if await self._try_initialize() and self._outowiki is not None:
             try:
                 conversation = _history_to_conversation(history)
+                query = ""
+                if conversation:
+                    recent = conversation[-3:]
+                    query_parts = [
+                        msg.get("content", "")
+                        for msg in recent
+                        if msg.get("content")
+                    ]
+                    query = " ".join(query_parts)
                 config = load_memory_config(self._config_dir)
-                max_tokens = config.get("max_tokens", 4096)
-                outomem = self._outomem
-                outomem_context = await asyncio.to_thread(
-                    outomem.get_context,
-                    full_history=conversation,
-                    max_tokens=max_tokens,
+                max_results = config.get("max_results", 10)
+                result = await self._outowiki.search(
+                    query or "recent",
+                    max_results=max_results,
+                    return_mode="full",
                 )
+                wiki_context = _search_result_to_context(result)
             except Exception as e:
-                logger.warning("outomem get_context failed: %s", e)
-                outomem_context = ""
+                logger.warning("outowiki search failed: %s", e)
+                wiki_context = ""
 
-        return self._format_context(me_content, outomem_context)
+        return self._format_context(me_content, wiki_context)
 
-    def _format_context(self, me_content: str | None, outomem_context: str) -> str:
+    def _format_context(self, me_content: str | None, wiki_context: str) -> str:
         parts: list[str] = []
 
         if me_content:
             parts.append("## User Identity (from me.md)\n" + me_content)
 
-        if outomem_context:
-            parts.append("## Memory Context (from outomem)\n" + outomem_context)
+        if wiki_context:
+            parts.append("## Memory Context (from outowiki)\n" + wiki_context)
 
         if not parts:
             return ""
@@ -738,12 +359,9 @@ class MemoryManager:
         user_message: str | None = None,
         assistant_message: str | None = None,
     ) -> None:
-        if self._outomem is None:
+        if self._outowiki is None:
             return
 
-        # Support both calling conventions:
-        # 1. remember_async(history=[msg1, msg2, ...])
-        # 2. remember_async(user_message="...", assistant_message="...")
         if history is None and user_message and assistant_message:
 
             class _Msg:
@@ -760,28 +378,39 @@ class MemoryManager:
         if not conversation:
             return
 
+        record_content = _conversation_to_record_content(conversation)
+        if not record_content:
+            return
+
         def _do_remember() -> None:
             try:
-                self._outomem.remember(conversation)
-                logger.debug(
-                    "outomem remember completed (%d messages)", len(conversation)
+                result = self._outowiki.record(
+                    record_content,
+                    metadata={"type": "conversation"},
                 )
+                if result.success:
+                    logger.debug(
+                        "outowiki record completed (%d docs affected)",
+                        result.documents_affected,
+                    )
+                else:
+                    logger.warning("outowiki record failed: %s", result.error)
             except Exception as e:
-                logger.warning("outomem remember failed: %s", e)
+                logger.warning("outowiki record failed: %s", e)
 
         thread = threading.Thread(target=_do_remember, daemon=True)
         thread.start()
 
     async def reinitialize(self) -> bool:
         async with self._lock:
-            self._outomem = None
+            self._outowiki = None
             self._initialized = False
             self._init_error = None
         return await self._try_initialize()
 
     @property
     def is_available(self) -> bool:
-        return self._outomem is not None
+        return self._outowiki is not None
 
     def get_config(self) -> dict[str, Any]:
         return load_memory_config(self._config_dir)
@@ -791,78 +420,56 @@ class MemoryManager:
         await self.reinitialize()
 
     async def save_config_only(self, config: dict[str, Any]) -> None:
-        embed_model = config.get("embed_model", "")
-        config["embed_dim"] = EMBED_MODEL_DIMENSIONS.get(embed_model, 1536)
         save_memory_config(self._config_dir, config)
 
     async def reset_memory(self) -> None:
-        lance_dir = self._config_dir / "outomem.lance"
-        if lance_dir.exists():
+        wiki_path = self._config_dir / "wiki"
+        if wiki_path.exists():
             import shutil
 
-            shutil.rmtree(lance_dir)
-            logger.info("Memory: Reset complete, deleted %s", lance_dir)
+            shutil.rmtree(wiki_path)
+            logger.info("Memory: Reset complete, deleted %s", wiki_path)
         else:
             logger.info("Memory: No data to reset")
         await self.reinitialize()
 
     async def migrate_memory(self) -> None:
-        backup_path = self._config_dir / "_migrate_backup.json"
-        if not self._outomem:
-            logger.warning("Memory: Cannot migrate, outomem not initialized")
-            return
-        try:
-            logger.info("Memory: Starting migration backup")
-            self._outomem.export_backup(str(backup_path))
-            lance_dir = self._config_dir / "outomem.lance"
-            if lance_dir.exists():
-                import shutil
-
-                shutil.rmtree(lance_dir)
-            logger.info("Memory: Importing with re-embedding")
-            self._outomem.import_backup(str(backup_path), reembed=True)
-            backup_path.unlink(missing_ok=True)
-            logger.info("Memory: Migration completed")
-        except Exception as e:
-            logger.error("Memory: Migration failed: %s", e)
-            raise
+        logger.info("Memory: outowiki uses file-based storage, no migration needed")
 
     async def health_check(self) -> dict[str, Any]:
-        """Check health of all memory system components.
-
-        Returns a dict with connection status for LanceDB, Neo4j,
-        and the embedding function, plus table statistics and node counts.
-        """
         try:
-            if not await self._try_initialize() or self._outomem is None:
-                reason = self._init_error
-                if not reason:
-                    reason = "Memory system failed to initialize (unknown reason - check server logs)"
+            if not await self._try_initialize() or self._outowiki is None:
+                reason = self._init_error or "Memory system failed to initialize"
                 return {
                     "healthy": False,
                     "reason": reason,
-                    "lancedb": {"connected": False},
-                    "neo4j": {"connected": False},
-                    "embedding": {"working": False},
+                    "wiki": {"accessible": False},
                 }
 
-            status = await asyncio.to_thread(self._outomem.health_check)
-            if not status.get("healthy") and not status.get("reason"):
-                errors = status.get("errors", {})
-                if errors:
-                    error_parts = [f"{k}: {v}" for k, v in errors.items()]
-                    status["reason"] = "; ".join(error_parts)
-                else:
-                    status["reason"] = (
-                        "Memory system unhealthy (check individual component statuses)"
-                    )
-            return status
+            config = load_memory_config(self._config_dir)
+            wiki_path = config.get("wiki_path", "") or str(
+                self._config_dir / "wiki"
+            )
+            wiki_dir = Path(wiki_path)
+            if not wiki_dir.exists():
+                return {
+                    "healthy": False,
+                    "reason": f"Wiki directory not found: {wiki_path}",
+                    "wiki": {"accessible": False},
+                }
+
+            doc_count = len(list(wiki_dir.rglob("*.md")))
+            return {
+                "healthy": True,
+                "wiki": {
+                    "accessible": True,
+                    "path": str(wiki_dir),
+                    "document_count": doc_count,
+                },
+            }
         except Exception as e:
-            logger.exception("Memory: health_check exception")
             return {
                 "healthy": False,
                 "reason": f"health_check failed: {type(e).__name__}: {e}",
-                "lancedb": {"connected": False},
-                "neo4j": {"connected": False},
-                "embedding": {"working": False},
+                "wiki": {"accessible": False},
             }

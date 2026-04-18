@@ -1,8 +1,8 @@
 """
-Note-to-outomem migration utility.
+Note-to-outowiki migration utility.
 
-Migrates existing note files from ~/.outobot/note/ into outomem memory
-by creating synthetic conversations and calling outomem.remember().
+Migrates existing note files from ~/.outobot/note/ into outowiki memory
+by creating synthetic conversations and calling outowiki.record().
 
 Usage:
     python -m outo.migrate_notes [--dry-run]
@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 from outo.agents import NOTE_DIR
-from outo.memory import MemoryManager
+from outo.memory import MemoryManager, _conversation_to_record_content
 from outo.providers import ProviderManager
 
 logger = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ def migrate_note_file(
     memory_manager: MemoryManager,
     dry_run: bool = False,
 ) -> bool:
-    """Migrate a single note file into outomem. Returns True on success."""
+    """Migrate a single note file into outowiki. Returns True on success."""
     try:
         content = filepath.read_text(encoding="utf-8").strip()
     except OSError as e:
@@ -64,16 +64,18 @@ def migrate_note_file(
         return True
 
     if not memory_manager.is_available:
-        logger.error("outomem is not available — cannot migrate")
+        logger.error("outowiki is not available — cannot migrate")
         return False
 
-    outomem = memory_manager._outomem
-    if outomem is None:
-        logger.error("outomem instance is None — cannot migrate")
+    wiki = memory_manager._outowiki
+    if wiki is None:
+        logger.error("outowiki instance is None — cannot migrate")
         return False
 
     try:
-        outomem.remember(conversation)
+        record_content = _conversation_to_record_content(conversation)
+        if record_content:
+            wiki.record(record_content, metadata={"type": "conversation", "source": "migration"})
         print(f"  Migrated: {filepath.name} ({len(content)} chars)")
         return True
     except Exception as e:
@@ -84,7 +86,7 @@ def migrate_note_file(
 def main() -> None:
 
     parser = argparse.ArgumentParser(
-        description="Migrate note files from ~/.outobot/note/ into outomem memory.",
+        description="Migrate note files from ~/.outobot/note/ into outowiki memory.",
     )
     _ = parser.add_argument(
         "--dry-run",
@@ -123,7 +125,7 @@ def main() -> None:
 
     if not dry_run and not memory_manager.is_available:
         print(
-            "Error: outomem is not available. Check memory configuration in settings."
+            "Error: outowiki is not available. Check memory configuration in settings."
         )
         sys.exit(1)
 

@@ -30,9 +30,9 @@ def recall_memory(
     """Recall memories. Pass a query for semantic search, or empty string to check status."""
     if not query:
         if _memory_manager is not None and _memory_manager.is_available:
-            status = "🧠 outomem is ACTIVE"
+            status = "🧠 outowiki is ACTIVE"
         else:
-            status = "⚠️ outomem not available (fallback to session search)"
+            status = "⚠️ outowiki not available (fallback to session search)"
 
         if SESSIONS_DIR.exists():
             count = len(list(SESSIONS_DIR.glob("*.json")))
@@ -41,9 +41,14 @@ def recall_memory(
 
     if _memory_manager is not None and _memory_manager.is_available:
         try:
-            context = _memory_manager._outomem.get_context(query)
-            if context:
-                return context
+            results = _memory_manager._outowiki.search(query, max_results=5, return_mode="full")
+            if results:
+                content_parts = []
+                for r in results:
+                    content_parts.append(r.content if hasattr(r, "content") else str(r))
+                context = "\n\n---\n\n".join(content_parts)
+                if context:
+                    return context
         except Exception:
             pass
 

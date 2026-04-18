@@ -208,7 +208,7 @@ setup_venv() {
             if [ "$INSTALLED_VERSION" != "$CURRENT_VERSION" ]; then
                 echo -e "  ${YELLOW}Version update detected: $INSTALLED_VERSION -> $CURRENT_VERSION${NC}"
                 echo -e "  Upgrading packages..."
-                "$OUTOBOT_BIN/pip" install --upgrade agentouto fastapi 'uvicorn[standard]' python-multipart aiohttp pydantic wsproto websockets discord.py outomem
+                "$OUTOBOT_BIN/pip" install --upgrade agentouto fastapi 'uvicorn[standard]' python-multipart aiohttp pydantic wsproto websockets discord.py outowiki
             else
                 echo -e "  Already up to date."
             fi
@@ -221,11 +221,11 @@ setup_venv() {
         # Install dependencies (venv includes pip by default in modern Python)
         echo -e "  Installing dependencies..."
         "$OUTOBOT_BIN/pip" install --upgrade pip
-        "$OUTOBOT_BIN/pip" install agentouto outomem
-        "$OUTOBOT_BIN/pip" install fastapi 'uvicorn[standard]' python-multipart outomem
-        "$OUTOBOT_BIN/pip" install aiohttp pydantic outomem
-        "$OUTOBOT_BIN/pip" install wsproto websockets outomem
-        "$OUTOBOT_BIN/pip" install discord.py outomem
+        "$OUTOBOT_BIN/pip" install agentouto outowiki
+        "$OUTOBOT_BIN/pip" install fastapi 'uvicorn[standard]' python-multipart outowiki
+        "$OUTOBOT_BIN/pip" install aiohttp pydantic outowiki
+        "$OUTOBOT_BIN/pip" install wsproto websockets outowiki
+        "$OUTOBOT_BIN/pip" install discord.py outowiki
     fi
     
     # Save version
@@ -414,139 +414,6 @@ setup_distrobox() {
     fi
 }
 
-setup_neo4j() {
-    echo -e "\n${YELLOW}[7/7] Setting up Neo4j for memory system...${NC}"
-    
-    NEO4J_CONTAINER="outobot-neo4j"
-    NEO4J_IMAGE="neo4j:latest"
-    NEO4J_BOLT_PORT="17241"
-    NEO4J_HTTP_PORT="17242"
-    NEO4J_PASSWORD="outobot-neo4j-pass"
-    NEO4J_DATA_DIR="$OUTOBOT_DIR/config/neo4j_data"
-    
-    CONTAINER_CMD=""
-    if command -v podman &> /dev/null; then
-        CONTAINER_CMD="podman"
-    elif command -v docker &> /dev/null; then
-        CONTAINER_CMD="docker"
-    else
-        echo -e "  ${RED}Neither podman nor docker found. Cannot set up Neo4j.${NC}"
-        return 1
-    fi
-    
-    echo -e "  Using: $CONTAINER_CMD"
-    
-    mkdir -p "$NEO4J_DATA_DIR"
-    echo -e "  Created data directory: $NEO4J_DATA_DIR"
-    
-    if $CONTAINER_CMD ps -a --format "{{.Names}}" 2>/dev/null | grep -q "^${NEO4J_CONTAINER}$"; then
-        echo -e "  Container '$NEO4J_CONTAINER' already exists."
-        
-        if $CONTAINER_CMD ps --format "{{.Names}}" 2>/dev/null | grep -q "^${NEO4J_CONTAINER}$"; then
-            echo -e "  Container is already running."
-        else
-            echo -e "  Starting existing container..."
-            $CONTAINER_CMD start "$NEO4J_CONTAINER" 2>&1
-        fi
-    else
-        echo -e "  Creating Neo4j container..."
-        $CONTAINER_CMD run -d \
-            --name "$NEO4J_CONTAINER" \
-            --userns=keep-id \
-            -e NEO4J_AUTH="neo4j/$NEO4J_PASSWORD" \
-            -e NEO4J_PLUGINS='["apoc"]' \
-            -p "$NEO4J_BOLT_PORT:7687" \
-            -p "$NEO4J_HTTP_PORT:7474" \
-            -v "$NEO4J_DATA_DIR:/data:Z" \
-            "$NEO4J_IMAGE" 2>&1 || {
-                echo -e "  ${RED}Failed to create Neo4j container.${NC}"
-                return 1
-            }
-        echo -e "  ${GREEN}Neo4j container created!${NC}"
-    fi
-    
-    echo -e "  Waiting for Neo4j to start..."
-    NEO4J_STARTED=false
-    for i in {1..30}; do
-        if $CONTAINER_CMD logs "$NEO4J_CONTAINER" 2>&1 | grep -q "Started\|Remote interface available"; then
-            echo -e "  ${GREEN}Neo4j is running!${NC}"
-            NEO4J_STARTED=true
-            break
-        fi
-        echo -n "."
-        sleep 1
-    done
-    echo ""
-    
-    if [ "$NEO4J_STARTED" = false ]; then
-        echo -e "  ${RED}Neo4j did not start within 30 seconds.${NC}"
-        echo -e "  ${YELLOW}Container logs:${NC}"
-        $CONTAINER_CMD logs --tail 20 "$NEO4J_CONTAINER" 2>&1 | sed 's/^/    /'
-    fi
-    
-    if command -v curl &> /dev/null; then
-        sleep 2
-        HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$NEO4J_HTTP_PORT" 2>&1)
-        if echo "$HTTP_STATUS" | grep -q "200\|302"; then
-            echo -e "  ${GREEN}Neo4j HTTP interface accessible at http://localhost:$NEO4J_HTTP_PORT${NC}"
-        else
-            echo -e "  ${YELLOW}Neo4j HTTP interface not accessible (status: $HTTP_STATUS)${NC}"
-            echo -e "  ${YELLOW}Bolt port: $NEO4J_BOLT_PORT${NC}"
-        fi
-    fi
-    
-    NEO4J_SERVICE="$HOME/.config/systemd/user/neo4j-outobot.service"
-    mkdir -p "$HOME/.config/systemd/user"
-    
-    cat > "$NEO4J_SERVICE" << NEO4J_SERVICE_CONTENT
-[Unit]
-Description=OutObot Neo4j Database
-After=network.target
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/bin/$CONTAINER_CMD start $NEO4J_CONTAINER
-ExecStop=/usr/bin/$CONTAINER_CMD stop $NEO4J_CONTAINER
-
-[Install]
-WantedBy=default.target
-NEO4J_SERVICE_CONTENT
-    
-    echo -e "  Created systemd service: neo4j-outobot.service"
-    
-    systemctl --user daemon-reload 2>/dev/null || true
-    systemctl --user enable neo4j-outobot.service 2>/dev/null || true
-    
-    echo -e "  Starting neo4j-outobot service..."
-    if systemctl --user start neo4j-outobot.service 2>/dev/null; then
-        echo -e "  ${GREEN}neo4j-outobot service started!${NC}"
-    else
-        echo -e "  ${YELLOW}Warning: Could not start neo4j-outobot service.${NC}"
-    fi
-    
-    echo -e "  ${GREEN}Neo4j auto-start configured!${NC}"
-    echo -e "  Bolt URI: bolt://localhost:$NEO4J_BOLT_PORT"
-    echo -e "  HTTP UI: http://localhost:$NEO4J_HTTP_PORT"
-    
-    MEMORY_CONFIG="$OUTOBOT_DIR/config/memory.json"
-    if [ -f "$MEMORY_CONFIG" ]; then
-        echo -e "  Updating memory configuration with Neo4j port..."
-        python3 << PYEOF
-import json
-try:
-    with open("$MEMORY_CONFIG", "r") as f:
-        config = json.load(f)
-    config["neo4j_uri"] = "bolt://localhost:$NEO4J_BOLT_PORT"
-    config["neo4j_password"] = "$NEO4J_PASSWORD"
-    with open("$MEMORY_CONFIG", "w") as f:
-        json.dump(config, f, indent=2)
-    print("  Memory config updated.")
-except Exception as e:
-    print(f"  Warning: Could not update memory.json: {e}")
-PYEOF
-    fi
-}
 
 # Auto-start the service
 auto_start() {
@@ -579,8 +446,7 @@ main() {
     setup_run_script
     setup_config
     setup_distrobox
-    setup_neo4j
-    
+
     echo ""
     echo -e "${GREEN}========================================${NC}"
     echo -e "${GREEN}  Installation Complete!${NC}"

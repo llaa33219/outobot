@@ -17,14 +17,7 @@ const PROVIDER_KEYS = [
   { name: 'xiaomi_token_plan', inputId: 'xiaomiTokenPlanKeyInput', statusId: 'xiaomiTokenPlanStatus', key: 'xiaomi_token_plan' },
 ];
 
-const EMBED_PROVIDER_KEYS = [
-  { name: 'openai', inputId: 'embedOpenaiKeyInput' },
-  { name: 'google', inputId: 'embedGoogleKeyInput' },
-  { name: 'cohere', inputId: 'embedCohereKeyInput' },
-  { name: 'voyage', inputId: 'embedVoyageKeyInput' },
-  { name: 'qwen', inputId: 'embedQwenKeyInput' },
-  { name: 'mistral', inputId: 'embedMistralKeyInput' },
-];
+
 
 const AGENT_DEFAULTS = {
   'outo': { icon: '🔆', label: 'OutObot', role: 'Coordinator', desc: 'Main orchestrator' },
@@ -72,8 +65,6 @@ class OutObotChat {
       fileInput: document.getElementById('fileInput'),
       attachBtn: document.getElementById('attachBtn'),
       attachmentPreview: document.getElementById('attachmentPreview'),
-      embedProviderSelect: document.getElementById('embedProviderSelect'),
-      embedModelSelect: document.getElementById('embedModelSelect'),
       memoryProvider: document.getElementById('memoryProvider'),
       memoryModel: document.getElementById('memoryModel'),
     };
@@ -82,7 +73,6 @@ class OutObotChat {
     this.providerConfig = {};
     this.discordConfig = {};
     this.memoryConfig = {};
-    this.embedProviderPresets = {};
     this.agentConfig = AGENT_DEFAULTS;
     this.currentAgent = 'outo';
     this.currentSession = null;
@@ -136,7 +126,6 @@ class OutObotChat {
     document.getElementById('openApiKeysBtn')?.addEventListener('click', () => this.openApiKeysSettings());
     document.getElementById('modelCancel')?.addEventListener('click', () => this.closeSettings());
     this.els.memoryProvider?.addEventListener('change', () => this.updateMemoryModels());
-    this.els.embedProviderSelect?.addEventListener('change', () => this.populateEmbedModelSelect(this.els.embedProviderSelect?.value));
     this.els.sidebarToggle.addEventListener('click', () => this.toggleSidebar());
 
     PROVIDER_KEYS.forEach(({ inputId }) => {
@@ -151,15 +140,6 @@ class OutObotChat {
       }
     });
 
-    EMBED_PROVIDER_KEYS.forEach(({ inputId }) => {
-      const input = document.getElementById(inputId);
-      if (input) {
-        input.addEventListener('input', () => {
-          this.populateEmbedProviderSelect();
-          this.populateEmbedModelSelect(this.els.embedProviderSelect?.value);
-        });
-      }
-    });
     this.els.sendBtn.addEventListener('click', () => this.sendMessage());
     this.els.attachBtn.addEventListener('click', () => this.els.fileInput.click());
     this.els.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
@@ -235,19 +215,6 @@ class OutObotChat {
     this.els.defaultModelSelect?.addEventListener('change', () => {
     });
 
-    this.els.embedProviderSelect?.addEventListener('change', () => {
-      const provider = this.els.embedProviderSelect.value;
-      this.populateEmbedModelSelect(provider);
-      const preset = this.embedProviderPresets[provider];
-      const urlInput = document.getElementById('embedUrlInput');
-      if (urlInput && preset) {
-        urlInput.value = preset.url || '';
-        urlInput.readOnly = (provider !== 'custom' && provider !== '');
-      } else if (urlInput) {
-        urlInput.readOnly = false;
-      }
-    });
-
     PROVIDER_KEYS.forEach(({ inputId }) => {
       const input = document.getElementById(inputId);
       if (input) {
@@ -270,8 +237,7 @@ class OutObotChat {
         this.loadAgents(),
         this.sessionManager.loadSessions(),
         this.loadSkills(),
-        this.loadDiscordConfig(),
-        this.loadEmbedProviders()
+        this.loadDiscordConfig()
       ]);
       
       this.buildAgentBar();
@@ -417,10 +383,8 @@ class OutObotChat {
       const status = await res.json();
       
       if (status.healthy) {
-        const lancedb = status.lancedb?.connected ? '✅' : '❌';
-        const neo4j = status.neo4j?.connected ? '✅' : '❌';
-        const embedding = status.embedding?.working ? '✅' : '❌';
-        const detail = `LanceDB ${lancedb} | Neo4j ${neo4j} | Embedding ${embedding}`;
+        const wiki = status.wiki?.connected ? '✅' : '❌';
+        const detail = `Wiki ${wiki}`;
         this.addLogEntry('🧠', '<strong>Memory</strong> system healthy', null, detail);
       } else {
         const reason = status.reason || 'Unknown error';
@@ -428,103 +392,6 @@ class OutObotChat {
       }
     } catch (err) {
       this.addLogEntry('⚠️', '<strong>Memory</strong> health check failed', 'warning', err.message);
-    }
-  }
-
-  async loadEmbedProviders() {
-    try {
-      const res = await fetch('/api/memory/embed-providers');
-      if (res.ok) {
-        this.embedProviderPresets = await res.json();
-      }
-    } catch (err) {
-      console.error('Failed to load embed providers:', err);
-    }
-  }
-
-  populateEmbedProviderSelect() {
-    const sel = this.els.embedProviderSelect;
-    if (!sel) return;
-    sel.innerHTML = '';
-
-    const emptyOpt = document.createElement('option');
-    emptyOpt.value = '';
-    emptyOpt.textContent = 'Select provider...';
-    sel.appendChild(emptyOpt);
-
-    Object.entries(this.embedProviderPresets).forEach(([key, preset]) => {
-      const embedKeyInfo = EMBED_PROVIDER_KEYS.find(p => p.name === key);
-      const embedKeyInput = embedKeyInfo ? document.getElementById(embedKeyInfo.inputId) : null;
-      const hasApiKey = embedKeyInput?.value?.trim() || this.memoryConfig.embed_provider === key;
-      if (hasApiKey) {
-        const opt = document.createElement('option');
-        opt.value = key;
-        opt.textContent = preset.name;
-        sel.appendChild(opt);
-      }
-    });
-
-    const current = this.memoryConfig.embed_provider || '';
-    if (current) sel.value = current;
-  }
-
-  getEmbedApiKeyForSave() {
-    const selectedProvider = this.els.embedProviderSelect?.value || '';
-    
-    if (selectedProvider) {
-      const embedKeyInfo = EMBED_PROVIDER_KEYS.find(p => p.name === selectedProvider);
-      const embedKeyInput = embedKeyInfo ? document.getElementById(embedKeyInfo.inputId) : null;
-      return embedKeyInput?.value?.trim() || '';
-    }
-    
-    for (const { name, inputId } of EMBED_PROVIDER_KEYS) {
-      const input = document.getElementById(inputId);
-      if (input?.value?.trim()) {
-        if (this.els.embedProviderSelect) this.els.embedProviderSelect.value = name;
-        return input.value.trim();
-      }
-    }
-    return '';
-  }
-
-  populateEmbedModelSelect(providerKey) {
-    const sel = this.els.embedModelSelect;
-    if (!sel) return;
-    sel.innerHTML = '';
-
-    const embedKeyInfo = EMBED_PROVIDER_KEYS.find(p => p.name === providerKey);
-    const embedKeyInput = embedKeyInfo ? document.getElementById(embedKeyInfo.inputId) : null;
-    const embedKeyValue = embedKeyInput?.value?.trim() || '';
-
-    if (!embedKeyValue) {
-      const opt = document.createElement('option');
-      opt.value = '';
-      opt.textContent = 'Enter API key first...';
-      sel.appendChild(opt);
-      return;
-    }
-
-    const preset = this.embedProviderPresets[providerKey];
-    if (!preset || !preset.models || preset.models.length === 0) {
-      const opt = document.createElement('option');
-      opt.value = '';
-      opt.textContent = 'Custom model...';
-      sel.appendChild(opt);
-      return;
-    }
-
-    preset.models.forEach(model => {
-      const opt = document.createElement('option');
-      opt.value = model;
-      opt.textContent = model;
-      sel.appendChild(opt);
-    });
-
-    const currentModel = this.memoryConfig.embed_model || '';
-    if (currentModel && preset.models.includes(currentModel)) {
-      sel.value = currentModel;
-    } else {
-      sel.value = preset.default_model || preset.models[0];
     }
   }
 
@@ -1141,9 +1008,6 @@ class OutObotChat {
   openSettings() {
     this.loadMemoryConfig().then(() => {
       this.syncSettingsInputs();
-      this.populateEmbedProviderSelect();
-      const ep = this.memoryConfig.embed_provider || '';
-      this.populateEmbedModelSelect(ep);
     });
     this.populateDefaultProviderSelect();
     this.updateDefaultModels();
@@ -1157,16 +1021,12 @@ class OutObotChat {
     });
     this.populateMemoryProviderSelect();
     this.updateMemoryModels();
-    this.populateEmbedProviderSelect();
     if (this.els.apiKeysModal) this.els.apiKeysModal.style.display = 'none';
     if (this.els.modelModal) this.els.modelModal.style.display = 'flex';
     this.els.settingsModalsContainer.classList.remove('hidden');
   }
 
   openApiKeysSettings() {
-    this.populateEmbedProviderSelect();
-    const ep = this.memoryConfig.embed_provider || '';
-    this.populateEmbedModelSelect(ep);
     if (this.els.modelModal) this.els.modelModal.style.display = 'none';
     if (this.els.apiKeysModal) this.els.apiKeysModal.style.display = 'flex';
   }
@@ -1184,31 +1044,6 @@ class OutObotChat {
       const models = this.getProviderModels(memoryProvider);
       if (models.includes(memoryModel)) {
         this.els.memoryModel.value = memoryModel;
-      }
-    }
-
-    this.populateEmbedProviderSelect();
-    const embedProvider = this.memoryConfig.embed_provider || '';
-    if (this.els.embedProviderSelect) this.els.embedProviderSelect.value = embedProvider;
-    
-    EMBED_PROVIDER_KEYS.forEach(({ name, inputId }) => {
-      const input = document.getElementById(inputId);
-      if (input) {
-        if (name === embedProvider) {
-          input.value = this.memoryConfig.embed_api_key || '';
-        } else {
-          input.value = '';
-        }
-      }
-    });
-    
-    this.populateEmbedModelSelect(embedProvider);
-
-    const embedModel = this.memoryConfig.embed_model || '';
-    if (embedModel && this.els.embedModelSelect) {
-      const preset = this.embedProviderPresets[embedProvider];
-      if (preset && preset.models.includes(embedModel)) {
-        this.els.embedModelSelect.value = embedModel;
       }
     }
   }
@@ -1250,27 +1085,6 @@ class OutObotChat {
         discordStatus.className = 'key-status';
       }
     }
-
-    this.populateEmbedProviderSelect();
-    const embedProvider = this.memoryConfig.embed_provider || '';
-    this.populateEmbedModelSelect(embedProvider);
-
-    const embedUrl = document.getElementById('embedUrlInput');
-    if (embedUrl) {
-      embedUrl.value = this.memoryConfig.embed_api_url || '';
-      embedUrl.readOnly = (embedProvider !== 'custom' && embedProvider !== '');
-    }
-
-    EMBED_PROVIDER_KEYS.forEach(({ name, inputId }) => {
-      const input = document.getElementById(inputId);
-      if (input) {
-        if (name === embedProvider) {
-          input.value = this.memoryConfig.embed_api_key || '';
-        } else {
-          input.value = '';
-        }
-      }
-    });
 
     const memoryEnabled = document.getElementById('memoryEnabled');
     if (memoryEnabled) memoryEnabled.value = String(this.memoryConfig.enabled || false);
@@ -1398,15 +1212,13 @@ class OutObotChat {
           enabled: true,
           provider: document.getElementById('memoryProvider')?.value || 'openai',
           memory_model: document.getElementById('memoryModel')?.value || '',
-          embed_provider: this.els.embedProviderSelect?.value || '',
-          embed_api_url: '',
-          embed_api_key: this.getEmbedApiKeyForSave() || '',
-          embed_model: this.els.embedModelSelect?.value || 'text-embedding-3-small'
+          wiki_path: this.memoryConfig.wiki_path || '',
+          max_results: this.memoryConfig.max_results || 10
         })
       });
       await this.loadMemoryConfig();
     } catch (err) {
-      console.error('Failed to save Memory embed config:', err);
+      console.error('Failed to save Memory config:', err);
     }
   }
 

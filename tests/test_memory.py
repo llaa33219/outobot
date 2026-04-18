@@ -1,7 +1,6 @@
-import asyncio
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -9,11 +8,7 @@ from outo.memory import (
     DEFAULT_MEMORY_CONFIG,
     MEMORY_CONFIG_FILENAME,
     MemoryManager,
-    NEO4J_CONTAINER_NAME,
-    NEO4J_DEFAULT_PASSWORD,
-    NEO4J_IMAGE,
     _history_to_conversation,
-    _map_provider_kind,
     load_memory_config,
     save_memory_config,
 )
@@ -27,14 +22,14 @@ class TestLoadMemoryConfig:
 
     def test_loads_stored_config(self, tmp_path: Path):
         config_file = tmp_path / MEMORY_CONFIG_FILENAME
-        stored = {"enabled": True, "provider": "anthropic", "neo4j_password": "secret"}
+        stored = {"enabled": True, "provider": "anthropic", "wiki_path": "/tmp/wiki"}
         config_file.write_text(json.dumps(stored), encoding="utf-8")
 
         config = load_memory_config(tmp_path)
         assert config["enabled"] is True
         assert config["provider"] == "anthropic"
-        assert config["neo4j_password"] == "secret"
-        assert config["embed_model"] == DEFAULT_MEMORY_CONFIG["embed_model"]
+        assert config["wiki_path"] == "/tmp/wiki"
+        assert config["max_results"] == DEFAULT_MEMORY_CONFIG["max_results"]
 
     def test_returns_defaults_on_corrupt_json(self, tmp_path: Path):
         config_file = tmp_path / MEMORY_CONFIG_FILENAME
@@ -57,24 +52,6 @@ class TestSaveMemoryConfig:
         assert loaded == data
 
 
-class TestMapProvider:
-    def test_maps_openai_responses(self):
-        assert _map_provider_kind("openai_responses") == "openai-responses"
-
-    def test_maps_openai(self):
-        assert _map_provider_kind("openai") == "openai"
-
-    def test_maps_anthropic(self):
-        assert _map_provider_kind("anthropic") == "anthropic"
-
-    def test_maps_google(self):
-        assert _map_provider_kind("google") == "google"
-
-    def test_unknown_falls_back_to_openai(self):
-        assert _map_provider_kind("minimax") == "openai"
-        assert _map_provider_kind("unknown_provider") == "openai"
-
-
 class TestHistoryToConversation:
     def test_converts_messages(self):
         msgs = [
@@ -86,7 +63,7 @@ class TestHistoryToConversation:
         assert result[0] == {"role": "user", "content": "Hello"}
         assert result[1] == {"role": "assistant", "content": "Hi there"}
 
-    def test_skips_system_messages(self):
+    def test_skips_empty_messages(self):
         msgs = [
             MagicMock(content="", sender="system"),
             MagicMock(content="Hi", sender="user"),
@@ -109,14 +86,14 @@ class TestMemoryManagerGetContext:
             result = await manager.get_context()
 
         assert result == ""
-        assert manager._outomem is None
+        assert manager._outowiki is None
 
     @pytest.mark.asyncio
-    async def test_falls_back_when_outomem_init_fails(self, tmp_path: Path):
+    async def test_falls_back_when_init_fails(self, tmp_path: Path):
         manager = MemoryManager(config_dir=tmp_path)
         manager._initialized = True
-        manager._outomem = None
-        manager._init_error = "outomem library not installed"
+        manager._outowiki = None
+        manager._init_error = "outowiki library not installed"
 
         with patch("outo.memory.get_me_content", return_value=None):
             result = await manager.get_context()
@@ -124,15 +101,17 @@ class TestMemoryManagerGetContext:
         assert result == ""
 
     @pytest.mark.asyncio
-    async def test_uses_outomem_when_available(self, tmp_path: Path):
+    async def test_uses_outowiki_when_available(self, tmp_path: Path):
         config_file = tmp_path / MEMORY_CONFIG_FILENAME
-        config_file.write_text(json.dumps({"max_tokens": 2048}))
+        config_file.write_text(json.dumps({"max_results": 5}))
 
         manager = MemoryManager(config_dir=tmp_path)
-        mock_outomem = MagicMock()
-        mock_outomem.get_context.return_value = "remembered: user likes Python"
+        mock_wiki = MagicMock()
+        mock_wiki.search = AsyncMock(return_value=MagicMock(
+            documents=["remembered: user likes Python"]
+        ))
         manager._initialized = True
-        manager._outomem = mock_outomem
+        manager._outowiki = mock_wiki
 
         msg = MagicMock(content="What languages?", sender="user")
 
@@ -141,7 +120,7 @@ class TestMemoryManagerGetContext:
 
         assert "I am direct" in result
         assert "remembered: user likes Python" in result
-        mock_outomem.get_context.assert_called_once()
+        mock_wiki.search.assert_called_once()
 
 
 class TestMemoryManagerRemember:
@@ -153,11 +132,12 @@ class TestMemoryManagerRemember:
 
         mock_threading.Thread.assert_not_called()
 
-    def test_remember_async_calls_outomem(self, tmp_path: Path):
+    def test_remember_async_calls_outowiki(self, tmp_path: Path):
         manager = MemoryManager(config_dir=tmp_path)
-        mock_outomem_client = MagicMock()
+        mock_wiki = MagicMock()
+        mock_wiki.record.return_value = MagicMock(success=True, documents_affected=1)
         manager._initialized = True
-        manager._outomem = mock_outomem_client
+        manager._outowiki = mock_wiki
 
         msg = MagicMock(content="Hello", sender="user")
 
@@ -173,6 +153,6 @@ class TestMemoryManagerRemember:
             target_fn = mock_threading.Thread.call_args[1]["target"]
             target_fn()
 
-        mock_outomem_client.remember.assert_called_once()
-        call_args = mock_outomem_client.remember.call_args[0]
-        assert call_args[0] == [{"role": "user", "content": "Hello"}]
+        mock_wiki.record.assert_called_once()
+        call_arg = mock_wiki.record.call_args[0][0]
+        assert "Hello" in call_arg

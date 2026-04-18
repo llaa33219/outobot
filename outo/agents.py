@@ -140,7 +140,7 @@ Skills are stored in ~/.outobot/skills/ directory. Each skill has a SKILL.md fil
 
 ## Memory System
 
-Your long-term memory is managed by outomem. Use `recall_memory(query)` to search past conversations and context. Memory is stored automatically — focus on answering the user, not on note-taking."""
+Your long-term memory is managed by outowiki. Use `recall_memory(query)` to search past conversations and context. Memory is stored automatically — focus on answering the user, not on note-taking."""
 
         self.agents["outo"] = Agent(
             name="outo",

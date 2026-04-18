@@ -23,7 +23,7 @@ OutObot uses a multi-agent architecture where specialized agents collaborate to 
 
 ## Memory System
 
-OutObot uses an intelligent memory system powered by **outomem** (Neo4j + LanceDB) for persistent agent memory across conversations. The system automatically stores and retrieves relevant context.
+OutObot uses an intelligent memory system powered by **outowiki** (markdown files + LLM) for persistent agent memory across conversations. The system automatically stores and retrieves relevant context.
 
 ### Architecture
 
@@ -31,12 +31,10 @@ OutObot uses an intelligent memory system powered by **outomem** (Neo4j + LanceD
 ┌─────────────────────────────────────────────────────────────┐
 │                      MemoryManager                          │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
-│  │   outomem   │  │   LanceDB   │  │       Neo4j         │ │
-│  │  (LLM+Emb)  │  │ (Vector DB) │  │ (Knowledge Graph)   │ │
+│  │   outowiki  │  │    LLM      │  │   Wiki Files        │ │
+│  │  (LLM+Wiki) │  │ (Semantic)  │  │  (Markdown)        │ │
 │  └─────────────┘  └─────────────┘  └─────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
-         │                  │                    │
-         └──────────────────┼────────────────────┘
                             │
               ┌─────────────┴─────────────┐
               │    Memory Context Injection │
@@ -48,22 +46,21 @@ OutObot uses an intelligent memory system powered by **outomem** (Neo4j + LanceD
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| `MemoryManager` | `outo/memory.py` | Main memory controller, manages outomem lifecycle |
-| `memory.json` | `~/.outobot/config/` | Memory configuration (provider, Neo4j, embeddings) |
-| `outomem.lance` | `~/.outobot/config/` | LanceDB vector store for semantic search |
-| Neo4j | `localhost:17241` | Knowledge graph for relationship-aware memory |
+| `MemoryManager` | `outo/memory.py` | Main memory controller, manages outowiki lifecycle |
+| `memory.json` | `~/.outobot/config/` | Memory configuration (provider, wiki_path, max_results) |
+| Wiki files | `~/.outobot/wiki/` | Markdown files storing conversation summaries |
 
 ### How It Works
 
-1. **Storage**: After each conversation, `MemoryManager.remember_async()` stores the exchange in both LanceDB (embeddings) and Neo4j (entities/relationships)
+1. **Storage**: After each conversation, `MemoryManager.remember_async()` stores a summary as a markdown file in the wiki directory
 
-2. **Retrieval**: Before each response, `MemoryManager.get_context()` queries outomem for relevant past context based on conversation history
+2. **Retrieval**: Before each response, `MemoryManager.get_context()` queries outowiki for relevant past context based on conversation history
 
 3. **Context Injection**: Retrieved memory is formatted and prepended as a system message containing:
    - User identity from `me.md`
-   - Relevant memory context from outomem
+   - Relevant memory context from outowiki
 
-4. **Fallback**: If outomem is unavailable, falls back to `recall_memory` tool for session-based search
+4. **Fallback**: If outowiki is unavailable, falls back to `recall_memory` tool for session-based search
 
 ### Memory Manager Methods
 
@@ -75,7 +72,7 @@ Retrieves relevant memory context for the current conversation.
 async def get_context(self, history: list[Any] | None = None) -> str
 ```
 
-- Queries outomem with conversation history
+- Queries outowiki with conversation history
 - Returns formatted context string (user identity + memory)
 - Returns empty string if no relevant context found
 
@@ -94,7 +91,7 @@ def remember_async(
 
 #### `is_available`
 
-Property indicating whether outomem is initialized and ready.
+Property indicating whether outowiki is initialized and ready.
 
 ```python
 @property
@@ -109,15 +106,9 @@ Memory is configured via `~/.outobot/config/memory.json`:
 {
   "enabled": true,
   "provider": "openai",
-  "embed_provider": "openai",
-  "embed_api_url": "https://api.openai.com/v1",
-  "embed_api_key": "sk-...",
-  "embed_model": "text-embedding-3-small",
-  "neo4j_uri": "bolt://localhost:17241",
-  "neo4j_user": "neo4j",
-  "neo4j_password": "outobot-neo4j-pass",
-  "db_path": "~/.outobot/config/outomem.lance",
-  "max_tokens": 4096
+  "memory_model": "",
+  "wiki_path": "~/.outobot/wiki",
+  "max_results": 5
 }
 ```
 
@@ -130,7 +121,7 @@ Agents now receive memory context automatically. The agent instructions include:
 ```
 ## Memory System
 
-Your long-term memory is managed by outomem. Use `recall_memory(query)` to search past conversations and context. Memory is stored automatically — focus on answering the user, not on note-taking.
+Your long-term memory is managed by outowiki. Use `recall_memory(query)` to search past conversations and context. Memory is stored automatically — focus on answering the user, not on note-taking.
 ```
 
 ### Note Files (Legacy Support)
@@ -141,7 +132,7 @@ Your long-term memory is managed by outomem. Use `recall_memory(query)` to searc
 |------|---------|
 | `me.md` | Agent identity: speech style, tone, personality traits |
 
-Other note files (`important.md`, etc.) are deprecated in favor of outomem but remain accessible via `recall_memory` tool.
+Other note files (`important.md`, etc.) are deprecated in favor of outowiki but remain accessible via `recall_memory` tool.
 
 ## AgentManager Class
 
@@ -264,7 +255,7 @@ All agents include Memory System documentation in their instructions:
 ```
 ## Memory System
 
-Your long-term memory is managed by outomem. Use `recall_memory(query)` to search past conversations and context. Memory is stored automatically — focus on answering the user, not on note-taking.
+Your long-term memory is managed by outowiki. Use `recall_memory(query)` to search past conversations and context. Memory is stored automatically — focus on answering the user, not on note-taking.
 ```
 
 ### OutObot (Coordinator) — Full Instructions
@@ -278,7 +269,7 @@ You are the main coordinator agent. Your role is to:
 {dynamically generated list from _build_skills_list()}
 
 ## Memory System
-Your long-term memory is managed by outomem. Use `recall_memory(query)` to search past conversations and context. Memory is stored automatically — focus on answering the user, not on note-taking.
+Your long-term memory is managed by outowiki. Use `recall_memory(query)` to search past conversations and context. Memory is stored automatically — focus on answering the user, not on note-taking.
 
 You can delegate to these specialized agents:
 - peritus: General professional work

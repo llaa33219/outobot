@@ -318,7 +318,6 @@ Manage memory system configuration and health.
 |----------|--------|-------------|
 | `/api/memory/config` | GET | Get memory configuration |
 | `/api/memory/config` | POST | Save memory configuration |
-| `/api/memory/embed-providers` | GET | List available embedding providers |
 | `/api/memory/status` | GET | Get memory system status |
 | `/api/memory/health` | GET | Get memory system health check |
 
@@ -332,17 +331,8 @@ Get current memory configuration.
   "enabled": true,
   "provider": "openai",
   "memory_model": "",
-  "embed_provider": "openai",
-  "embed_api_url": "https://api.openai.com/v1",
-  "embed_api_key": "sk-...",
-  "embed_model": "text-embedding-3-small",
-  "neo4j_uri": "bolt://localhost:17241",
-  "neo4j_user": "neo4j",
-  "neo4j_password": "",
-  "neo4j_container_name": "outobot-neo4j",
-  "neo4j_image": "neo4j:latest",
-  "db_path": "",
-  "max_tokens": 4096
+  "wiki_path": "~/.outobot/wiki",
+  "max_results": 5
 }
 ```
 
@@ -355,14 +345,9 @@ Save memory configuration.
 {
   "enabled": true,
   "provider": "openai",
-  "embed_provider": "openai",
-  "embed_api_url": "https://api.openai.com/v1",
-  "embed_api_key": "sk-...",
-  "embed_model": "text-embedding-3-small",
-  "neo4j_uri": "bolt://localhost:17241",
-  "neo4j_user": "neo4j",
-  "neo4j_password": "outobot-neo4j-pass",
-  "db_path": "~/.outobot/config/outomem.lance"
+  "memory_model": "",
+  "wiki_path": "~/.outobot/wiki",
+  "max_results": 5
 }
 ```
 
@@ -371,33 +356,6 @@ Save memory configuration.
 {
   "status": "ok",
   "message": "Memory configuration saved. Restart may be required."
-}
-```
-
-#### GET /api/memory/embed-providers
-
-Get list of available embedding provider presets.
-
-**Response:**
-```json
-{
-  "openai": {
-    "name": "OpenAI",
-    "url": "https://api.openai.com/v1",
-    "default_model": "text-embedding-3-small",
-    "models": ["text-embedding-3-small", "text-embedding-3-large", "text-embedding-ada-002"]
-  },
-  "google": {
-    "name": "Google",
-    "url": "https://generativelanguage.googleapis.com/v1beta2",
-    "default_model": "text-embedding-004",
-    "models": ["text-embedding-005", "text-embedding-004"]
-  },
-  "cohere": { ... },
-  "voyage": { ... },
-  "qwen": { ... },
-  "mistral": { ... },
-  "custom": { ... }
 }
 ```
 
@@ -421,9 +379,7 @@ Get detailed health check of memory system components.
 ```json
 {
   "healthy": true,
-  "lancedb": {"connected": true},
-  "neo4j": {"connected": true},
-  "embedding": {"working": true}
+  "wiki": {"available": true}
 }
 ```
 
@@ -431,10 +387,8 @@ Get detailed health check of memory system components.
 ```json
 {
   "healthy": false,
-  "reason": "Neo4j connection failed",
-  "lancedb": {"connected": true},
-  "neo4j": {"connected": false},
-  "embedding": {"working": true}
+  "reason": "Wiki directory not accessible",
+  "wiki": {"available": false}
 }
 ```
 
