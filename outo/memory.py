@@ -202,6 +202,45 @@ class MemoryManager:
         self._initialized = False
         self._init_error: str | None = None
         self._lock = asyncio.Lock()
+        self._debug_logs: list[str] = []
+        self._debug_handler: Any = None
+        self._setup_debug_logging()
+
+    def _setup_debug_logging(self) -> None:
+        """Setup logging to capture outowiki debug logs."""
+        import logging
+        import io
+
+        outowiki_logger = logging.getLogger("outowiki")
+        outowiki_logger.setLevel(logging.DEBUG)
+
+        self._debug_handler = logging.StreamHandler(io.StringIO())
+        self._debug_handler.setLevel(logging.DEBUG)
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        self._debug_handler.setFormatter(formatter)
+        outowiki_logger.addHandler(self._debug_handler)
+
+    def get_debug_logs(self, max_lines: int = 50) -> list[str]:
+        """Get recent debug logs from outowiki."""
+        import io
+
+        if not self._debug_handler:
+            return []
+
+        stream = self._debug_handler.stream
+        if isinstance(stream, io.StringIO):
+            logs = stream.getvalue()
+            if logs:
+                lines = logs.strip().split("\n")
+                return lines[-max_lines:]
+        return []
+
+    def clear_debug_logs(self) -> None:
+        """Clear debug log buffer."""
+        import io
+
+        if self._debug_handler and isinstance(self._debug_handler.stream, io.StringIO):
+            self._debug_handler.stream = io.StringIO()
 
     async def _try_initialize(self) -> bool:
         if self._initialized:
@@ -269,6 +308,8 @@ class MemoryManager:
                     model=model,
                     max_output_tokens=max_output_tokens,
                     wiki_path=wiki_path,
+                    debug=True,
+                    log_level="DEBUG",
                 )
                 self._outowiki = OutoWiki(wiki_config)
                 self._init_error = None

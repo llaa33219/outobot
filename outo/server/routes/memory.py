@@ -72,4 +72,11 @@ def create_memory_routes(app, memory_manager):
         await memory_manager.migrate_memory()
         return {"status": "ok", "message": "Memory migration complete."}
 
+    @router.get("/api/memory/debug")
+    async def get_memory_debug(max_lines: int = 50):
+        if not memory_manager:
+            return {"logs": [], "reason": "Memory manager not initialized"}
+        logs = memory_manager.get_debug_logs(max_lines=max_lines)
+        return {"logs": logs}
+
     return router

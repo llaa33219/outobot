@@ -288,6 +288,7 @@ class OutObotChat {
       this.reconnecting = false;
       this.logActivity('Connected to server');
       this.checkMemoryHealth();
+      this.fetchMemoryDebugLogs();
       this.restoreActiveExecution();
     };
 
@@ -392,6 +393,22 @@ class OutObotChat {
       }
     } catch (err) {
       this.addLogEntry('⚠️', '<strong>Memory</strong> health check failed', 'warning', err.message);
+    }
+  }
+
+  async fetchMemoryDebugLogs() {
+    try {
+      const res = await fetch('/api/memory/debug?max_lines=20');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.logs && data.logs.length > 0) {
+        const lastLogs = data.logs.slice(-5);
+        lastLogs.forEach(log => {
+          this.addLogEntry('🔍', '<strong>OutoWiki</strong> debug', null, log);
+        });
+      }
+    } catch (err) {
+      console.error('Failed to fetch memory debug logs:', err);
     }
   }
 
