@@ -29,7 +29,7 @@ def create_memory_routes(app, memory_manager):
             raise HTTPException(
                 status_code=500, detail="Memory manager not initialized"
             )
-        await memory_manager.save_config_only(config.model_dump())
+        await memory_manager.save_config(config.model_dump())
         return {
             "status": "ok",
             "message": "Memory configuration saved.",
