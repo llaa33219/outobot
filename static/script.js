@@ -383,7 +383,7 @@ class OutObotChat {
       const status = await res.json();
       
       if (status.healthy) {
-        const wiki = status.wiki?.connected ? '✅' : '❌';
+        const wiki = status.wiki?.accessible ? '✅' : '❌';
         const detail = `Wiki ${wiki}`;
         this.addLogEntry('🧠', '<strong>Memory</strong> system healthy', null, detail);
       } else {
