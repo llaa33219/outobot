@@ -41,12 +41,28 @@ class ExecutionManager:
         self._subscribers: dict[str, list[asyncio.Queue[dict[str, object] | None]]] = {}
         self._sessions_dir: Path | None = None
         self._initialized = False
+        self._internal_queues: dict[str, asyncio.Queue[dict[str, Any]]] = {}
+        self._user_msg_queues: dict[str, asyncio.Queue[str]] = {}
+        self._active_senders: dict[str, Callable[[str], None]] = {}
 
     def initialize(self, sessions_dir: Path) -> None:
         """Initialize with sessions directory and recover any pending executions."""
         self._sessions_dir = sessions_dir
         self._recovery_pending_executions()
         self._initialized = True
+
+    async def send_user_message(self, session_id: str, message: str) -> bool:
+        sender = self._active_senders.get(session_id)
+        if sender:
+            sender(message)
+            return True
+
+        queue = self._user_msg_queues.get(session_id)
+        if queue:
+            await queue.put(message)
+            return True
+
+        return False
 
     def _recovery_pending_executions(self) -> None:
         """Recover any executions that were running when server shut down."""
@@ -228,6 +244,64 @@ class ExecutionManager:
                 for queue in self._subscribers.get(execution.session_id, []):
                     await queue.put(memory_event)
 
+            internal_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+            self._internal_queues[execution.session_id] = internal_queue
+            user_msg_queue: asyncio.Queue[str] = asyncio.Queue()
+            self._user_msg_queues[execution.session_id] = user_msg_queue
+
+            def on_message_callback(msg, send):
+                self._active_senders[execution.session_id] = send
+                while True:
+                    try:
+                        pending = user_msg_queue.get_nowait()
+                        send(pending)
+                    except asyncio.QueueEmpty:
+                        break
+                event_data = {
+                    "type": "user_message",
+                    "agent_name": getattr(msg, "sender", ""),
+                    "call_id": getattr(msg, "call_id", ""),
+                    "data": {
+                        "message": getattr(msg, "content", ""),
+                        "sender": getattr(msg, "sender", ""),
+                    },
+                }
+                execution.events_buffer.append(event_data)
+                internal_queue.put_nowait(event_data)
+
+            def on_summarize_callback(info):
+                if memory_manager is not None and memory_manager.is_available:
+                    try:
+                        summarized_content = self._build_summarized_content(info)
+                        memory_manager.remember_summary_async(
+                            content=summarized_content,
+                            agent_name=info.agent_name,
+                            summary=info.summary,
+                            next_steps=info.next_steps,
+                            tokens_before=info.tokens_before,
+                            tokens_after=info.tokens_after,
+                        )
+                    except Exception:
+                        pass
+                event_data = {
+                    "type": "summarized",
+                    "agent_name": info.agent_name,
+                    "call_id": "",
+                    "data": {
+                        "summary": info.summary[:500]
+                        + ("..." if len(info.summary) > 500 else ""),
+                        "next_steps": info.next_steps[:300]
+                        if info.next_steps
+                        else None,
+                        "tokens_before": info.tokens_before,
+                        "tokens_after": info.tokens_after,
+                        "message_count": len(info.messages_to_summarize),
+                    },
+                }
+                execution.events_buffer.append(event_data)
+                internal_queue.put_nowait(event_data)
+                return None
+
             async for event in async_run_stream(
                 starting_agents=[agent],
                 message=message,
@@ -237,7 +311,26 @@ class ExecutionManager:
                 history=history_to_use if history_to_use is not None else history,
                 extra_instructions=extra_instructions,
                 extra_instructions_scope="all",
+                on_message=on_message_callback,
+                on_summarize=on_summarize_callback,
             ):
+                while not internal_queue.empty():
+                    try:
+                        cb_event = internal_queue.get_nowait()
+                        for queue in self._subscribers.get(execution.session_id, []):
+                            await queue.put(cb_event)
+                    except asyncio.QueueEmpty:
+                        break
+
+                sender = self._active_senders.get(execution.session_id)
+                if sender:
+                    while not user_msg_queue.empty():
+                        try:
+                            user_msg = user_msg_queue.get_nowait()
+                            sender(user_msg)
+                        except asyncio.QueueEmpty:
+                            break
+
                 event_data = self._transform_event(
                     transform_fn, event, execution.session_id, pending_delegations
                 )
@@ -312,6 +405,10 @@ class ExecutionManager:
                 await queue.put(error_event)
             self._persist_execution_state(execution, sessions_dir)
         finally:
+            self._internal_queues.pop(execution.session_id, None)
+            self._user_msg_queues.pop(execution.session_id, None)
+            self._active_senders.pop(execution.session_id, None)
+
             for queue in self._subscribers.get(execution.session_id, []):
                 await queue.put(None)
 
@@ -450,3 +547,17 @@ class ExecutionManager:
             self._executions.pop(session_id, None)
             self._subscribers.pop(session_id, None)
             self._tasks.pop(session_id, None)
+
+    def _build_summarized_content(self, info) -> str:
+        parts = [f"# Summarization ({info.agent_name})"]
+        parts.append(f"Tokens: {info.tokens_before} → {info.tokens_after}")
+        parts.append(f"\n## Summary\n{info.summary}")
+        if info.next_steps:
+            parts.append(f"\n## Next Steps\n{info.next_steps}")
+        parts.append(f"\n## Summarized Messages ({len(info.messages_to_summarize)} messages)")
+        for msg in info.messages_to_summarize:
+            role = getattr(msg, "role", "unknown")
+            content = getattr(msg, "content", None) or str(msg)
+            if content:
+                parts.append(f"[{role}] {content[:200]}")
+        return "\n".join(parts)

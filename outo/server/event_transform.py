@@ -106,4 +106,29 @@ def transform_stream_event(
             },
         }
 
+    elif etype == "user_message":
+        return {
+            "type": "user_message",
+            "agent_name": event.agent_name,
+            "call_id": event.call_id,
+            "data": {
+                "message": event.data.get("message", ""),
+                "sender": event.data.get("sender", ""),
+            },
+        }
+
+    elif etype == "summarized":
+        return {
+            "type": "summarized",
+            "agent_name": event.agent_name,
+            "call_id": event.call_id,
+            "data": {
+                "summary": event.data.get("summary", ""),
+                "next_steps": event.data.get("next_steps"),
+                "tokens_before": event.data.get("tokens_before", 0),
+                "tokens_after": event.data.get("tokens_after", 0),
+                "message_count": event.data.get("message_count", 0),
+            },
+        }
+
     return None

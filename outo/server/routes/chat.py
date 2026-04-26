@@ -428,6 +428,29 @@ def create_chat_routes(
                                 exec_mgr.unsubscribe(reconnect_session_id, queue)
                     continue
 
+                if data.get("type") == "send_to_agent":
+                    target_session = data.get("session_id", "")
+                    msg_content = data.get("message", "")
+                    if exec_mgr and target_session:
+                        success = await exec_mgr.send_user_message(
+                            target_session, msg_content
+                        )
+                        await safe_send(
+                            {
+                                "type": "send_to_agent_result",
+                                "data": {"session_id": target_session, "success": success},
+                            }
+                        )
+                    else:
+                        await safe_send(
+                            {
+                                "type": "error",
+                                "agent_name": "system",
+                                "data": {"message": "Invalid send_to_agent request"},
+                            }
+                        )
+                    continue
+
                 message = data.get("message", "")
                 agent_name = data.get("agent", "outo")
                 session_id = data.get("session_id", "")
@@ -624,5 +647,26 @@ def create_chat_routes(
             {"session_id": e.session_id, "status": e.status, "agent_name": e.agent_name}
             for e in exec_mgr.get_active()
         ]
+
+    @router.post("/api/execution/{session_id}/message")
+    async def send_to_execution(session_id: str, req: Request):
+        exec_mgr = getattr(req.app.state, "execution_manager", None)
+        if not exec_mgr:
+            raise HTTPException(status_code=400, detail="Execution manager not initialized")
+
+        body = await req.json()
+        message = body.get("message", "")
+        if not message.strip():
+            raise HTTPException(status_code=400, detail="Empty message")
+
+        execution = exec_mgr.get(session_id)
+        if not execution or execution.status != "running":
+            raise HTTPException(status_code=404, detail="No running execution for this session")
+
+        success = await exec_mgr.send_user_message(session_id, message)
+        if not success:
+            raise HTTPException(status_code=503, detail="Agent not ready to receive messages")
+
+        return {"status": "sent", "session_id": session_id}
 
     return router

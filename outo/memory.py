@@ -442,6 +442,42 @@ class MemoryManager:
         thread = threading.Thread(target=_do_remember, daemon=True)
         thread.start()
 
+    def remember_summary_async(
+        self,
+        content: str,
+        agent_name: str,
+        summary: str,
+        next_steps: str | None = None,
+        tokens_before: int = 0,
+        tokens_after: int = 0,
+    ) -> None:
+        if self._outowiki is None:
+            return
+
+        def _do_record() -> None:
+            try:
+                result = self._outowiki.record(
+                    content,
+                    metadata={
+                        "type": "summarization",
+                        "agent_name": agent_name,
+                        "tokens_before": tokens_before,
+                        "tokens_after": tokens_after,
+                    },
+                )
+                if result.success:
+                    logger.debug(
+                        "outowiki summarize record completed (%d docs affected)",
+                        result.documents_affected,
+                    )
+                else:
+                    logger.warning("outowiki summarize record failed: %s", result.error)
+            except Exception as e:
+                logger.warning("outowiki summarize record failed: %s", e)
+
+        thread = threading.Thread(target=_do_record, daemon=True)
+        thread.start()
+
     async def reinitialize(self) -> bool:
         async with self._lock:
             self._outowiki = None

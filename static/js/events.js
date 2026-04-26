@@ -50,6 +50,12 @@ class EventHandlers {
       case 'memory_store':
         this.handleMemoryStore(agent, cid, data);
         break;
+      case 'user_message':
+        this.handleUserMessage(agent, cid, data);
+        break;
+      case 'summarized':
+        this.handleSummarized(agent, cid, data);
+        break;
     }
   }
 
@@ -209,6 +215,34 @@ class EventHandlers {
     this.chat.addLogEntry(
       '💾',
       '<strong>Memory stored</strong>',
+      'log-memory',
+      parts.length ? parts.join(' | ') : null
+    );
+  }
+
+  handleUserMessage(agent, cid, data) {
+    const message = data.message || '';
+    const sender = data.sender || agent;
+    this.chat.ensureAgentBubble(agent);
+    this.chat.addLogEntry(
+      '💬',
+      '<strong>' + this.ui.getAgentLabel(sender) + '</strong> → user',
+      'log-message',
+      message ? this.ui.truncateText(message, 150) : null
+    );
+    this.scheduleScroll();
+  }
+
+  handleSummarized(agent, cid, data) {
+    this.chat.ensureAgentBubble(agent);
+    const parts = [];
+    if (data.message_count) parts.push(data.message_count + ' messages summarized');
+    if (data.tokens_before && data.tokens_after) {
+      parts.push(data.tokens_before + ' → ' + data.tokens_after + ' tokens');
+    }
+    this.chat.addLogEntry(
+      '📝',
+      '<strong>Context summarized</strong>',
       'log-memory',
       parts.length ? parts.join(' | ') : null
     );
