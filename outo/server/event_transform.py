@@ -99,6 +99,7 @@ def transform_stream_event(
             "type": "finish",
             "agent_name": event.agent_name,
             "call_id": event.call_id,
+            "parent_call_id": getattr(event, 'parent_call_id', None),
             "data": {
                 "message": output,
                 "output": output,

@@ -147,6 +147,7 @@ class UIRenderer {
 
     const msg = document.createElement('div');
     msg.className = 'message agent';
+    msg.dataset.agent = agentName;
 
     const avatar = document.createElement('div');
     avatar.className = 'message-avatar';

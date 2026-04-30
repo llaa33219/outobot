@@ -12,7 +12,7 @@ class EventHandlers {
   }
 
   handleEvent(event) {
-    const { type, agent_name, data, call_id } = event;
+    const { type, agent_name, data, call_id, parent_call_id } = event;
     const agent = agent_name || 'outo';
     const cid = call_id || agent;
 
@@ -39,7 +39,7 @@ class EventHandlers {
         this.handleError(agent, cid, data);
         break;
       case 'finish':
-        this.handleFinish(agent, cid, data);
+        this.handleFinish(agent, cid, data, parent_call_id);
         break;
       case 'forward':
         this.handleForward(agent, data);
@@ -79,6 +79,7 @@ class EventHandlers {
   handleAgentCall(agent, cid, data) {
     const caller = data.from || agent;
     const target = data.agent_name || agent;
+    this.chat.callStack.push(caller);
     this.chat.ensureAgentBubble(agent);
     this.updateActivityIndicator('Delegating to ' + target + '...');
     this.chat.addLogEntry(
@@ -91,6 +92,10 @@ class EventHandlers {
   }
 
   handleAgentReturn(agent, cid, data) {
+    const parentAgent = this.chat.callStack.pop();
+    if (parentAgent) {
+      this.chat.ensureAgentBubble(parentAgent);
+    }
     this.chat.addLogEntry(
       this.ui.getAgentIcon(agent),
       '<strong>' + this.ui.getAgentLabel(agent) + '</strong> done',
@@ -148,10 +153,10 @@ class EventHandlers {
     this.chat.scrollToBottom();
   }
 
-  handleFinish(agent, cid, data) {
+  handleFinish(agent, cid, data, parentId) {
     // Only process finish for the top-level (starting) agent.
     // Sub-agent finish events are internal and should not render in the main bubble.
-    if (agent !== this.chat._sentAgent) {
+    if (parentId) {
       return;
     }
 
