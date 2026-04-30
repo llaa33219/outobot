@@ -254,5 +254,5 @@ app = create_app()
 if __name__ == "__main__":
     import uvicorn
 
-    print("Starting OutObot server on http://localhost:7227")
-    uvicorn.run(app, host="localhost", port=7227)
+    print("Starting OutObot server on http://0.0.0.0:7227")
+    uvicorn.run(app, host="0.0.0.0", port=7227)
