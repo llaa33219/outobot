@@ -55,6 +55,8 @@ Go to the **Settings** tab and enter API keys for your preferred AI provider:
 - **Kimi Code Plan** - Kimi coding-optimized model (kimi-k2.5)
 - **Xiaomi MiMo** - Xiaomi AI (mimo-v2-flash, mimo-v2-pro, mimo-v2-omni)
 - **Xiaomi MiMo Token Plan** - Xiaomi AI token plan (mimo-v2-flash, mimo-v2-pro, mimo-v2-omni)
+- **OpenRouter** - Access 100+ models via single API (openai/gpt-4o, anthropic/claude-3.5-sonnet, etc.)
+- **Ollama (Local)** - Run open-source models locally (llama3.2, mistral, phi3, etc.)
 
 Check "Enable", enter your API key, select a model, then click **Save Configuration**.
 

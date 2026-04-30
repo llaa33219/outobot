@@ -59,6 +59,26 @@ Active provider configuration with API keys and settings. This is the main confi
     "enabled": false,
     "api_key": "",
     "model": "kimi-k2.5"
+  },
+  "xiaomi": {
+    "enabled": false,
+    "api_key": "",
+    "model": "mimo-v2-flash"
+  },
+  "xiaomi_token_plan": {
+    "enabled": false,
+    "api_key": "",
+    "model": "mimo-v2-flash"
+  },
+  "openrouter": {
+    "enabled": false,
+    "api_key": "",
+    "model": "openai/gpt-4o"
+  },
+  "ollama": {
+    "enabled": false,
+    "base_url": "http://localhost:11434/v1",
+    "model": "llama3.2"
   }
 }
 ```
@@ -149,14 +169,47 @@ Active provider configuration with API keys and settings. This is the main confi
 | Base URL | https://api.moonshot.ai/v1 |
 | API Key | Required |
 
-### Local (Ollama/vLLM)
+### Xiaomi MiMo
 
 | Setting | Value |
 |---------|-------|
-| Name | Local |
-| Models | Any (from Ollama) |
+| Name | Xiaomi MiMo |
+| Models | mimo-v2-flash, mimo-v2-pro, mimo-v2-omni |
+| Base URL | https://api.mimo.xiaomi.com/v1 |
+| API Key | Required |
+
+### Xiaomi MiMo Token Plan
+
+| Setting | Value |
+|---------|-------|
+| Name | Xiaomi MiMo Token Plan |
+| Models | mimo-v2-flash, mimo-v2-pro, mimo-v2-omni |
+| Base URL | https://token-plan-sgp.xiaomimimo.com/v1 |
+| API Key | Required |
+
+### OpenRouter
+
+| Setting | Value |
+|---------|-------|
+| Name | OpenRouter |
+| Models | 100+ models (openai/gpt-4o, anthropic/claude-3.5-sonnet, google/gemini-pro-1.5, etc.) |
+| Base URL | https://openrouter.ai/api/v1 |
+| API Key | sk-or-... (from https://openrouter.ai/keys) |
+| URL | https://openrouter.ai |
+
+OpenRouter provides access to 100+ AI models from various providers through a single API. Models are specified in `provider/model` format (e.g., `openai/gpt-4o`).
+
+### Ollama (Local)
+
+| Setting | Value |
+|---------|-------|
+| Name | Ollama (Local) |
+| Models | llama3.2, mistral, phi3, qwen2.5, etc. |
 | Base URL | http://localhost:11434/v1 |
-| API Key | not-needed |
+| API Key | ollama (or any string) |
+| URL | https://ollama.com |
+
+Ollama runs open-source LLMs locally. Install from https://ollama.com and pull models with `ollama pull <model>`.
 
 ## config.yaml
 

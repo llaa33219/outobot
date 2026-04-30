@@ -613,6 +613,7 @@ Response completion.
   "type": "finish",
   "agent_name": "outo",
   "call_id": "call_abc123",
+  "parent_call_id": "call_xyz789",
   "data": {
     "message": "Final response text...",
     "output": "Final response text...",
@@ -625,9 +626,62 @@ Response completion.
 - `type`: Event type ("finish")
 - `agent_name`: Name of the agent that completed
 - `call_id`: Unique identifier for the agent call
+- `parent_call_id`: Call ID of the parent agent (null for top-level agents, set for sub-agents)
 - `data.message`: Final message content
 - `data.output`: Same as message (for compatibility)
 - `data.session_id`: Session identifier for conversation continuity
+
+##### user_message
+
+User message display in agent conversation flow.
+
+```json
+{
+  "type": "user_message",
+  "agent_name": "outo",
+  "call_id": "call_abc123",
+  "data": {
+    "message": "User's message text",
+    "sender": "user"
+  }
+}
+```
+
+**Fields:**
+- `type`: Event type ("user_message")
+- `agent_name`: Name of the agent processing the message
+- `call_id`: Unique identifier for the agent call
+- `data.message`: The user's message content
+- `data.sender`: Message sender identifier
+
+##### summarized
+
+Context summarization event. Sent when conversation context is summarized to reduce token usage.
+
+```json
+{
+  "type": "summarized",
+  "agent_name": "outo",
+  "call_id": "call_abc123",
+  "data": {
+    "summary": "Summary of the conversation...",
+    "next_steps": "Suggested next steps...",
+    "tokens_before": 5000,
+    "tokens_after": 1200,
+    "message_count": 15
+  }
+}
+```
+
+**Fields:**
+- `type`: Event type ("summarized")
+- `agent_name`: Name of the agent that triggered summarization
+- `call_id`: Unique identifier for the agent call
+- `data.summary`: The generated summary text
+- `data.next_steps`: Suggested next steps (optional)
+- `data.tokens_before`: Token count before summarization
+- `data.tokens_after`: Token count after summarization
+- `data.message_count`: Number of messages summarized
 ```
 
 **JavaScript Example:**
@@ -754,7 +808,9 @@ All streaming event types (`token`, `tool_call`, `tool_result`, `agent_call`, `a
 | `agent_return` | Agent returning (correlates via `call_id`) |
 | `thinking` | Agent reasoning |
 | `error` | Error message |
-| `finish` | Complete |
+| `finish` | Complete (includes `parent_call_id` for sub-agent filtering) |
+| `user_message` | User message display in agent flow |
+| `summarized` | Context summarization event with token count changes |
 | `execution_started` | Acknowledgment after execution begins (WebSocket only) |
 | `execution_state` | Current execution state on reconnect (WebSocket only) |
 

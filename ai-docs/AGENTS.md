@@ -1,6 +1,6 @@
 # OutObot Agent System
 
-**이거 무조건 들어라. 상식이 있으면 아래 사항과 같은 사회적 낙오자 느낌나고 공감능력 떨어지고 실수 자주하고 다른사람에게 항상 혼나고만 있는 인생 문제있는 쓰레기같은 실수를 저지르면 안됨**
+**이거 무조건 들어라. 상식이 있으면 아래 사항과 같은 실수를 절대 저지르면 안됨**
 1. 아무것도 모르고 이 디렉토리에서 수정하고 이 디렉토리 파일로 서버 띄우기(아니, 서버는 ~/.outobot/에 있는거로 띄우는거임. install.sh랑 uninstall.sh랑 dev-reinstall.sh보면 모름? 확인좀 하고 살아)
 2. 니 마음데로 서버 종료시켜서 유령 프로세스 만들어서 포트 하나를 두 프로세스가 점유하다가 페이지 꼬여서 개발 망치기.(아니 설치, 제거, 재설치 스크립트가 있잖아. 근데 왜 대체 왜 직접 하는거임? 뇌가 있으면 그런짓은 하는게 아님)
 3. 코드도 잘 읽지도 않고 지 마음데로 판단해서 변경하기.(읽고 좀 변경해라. 아니면 여기 ai-docs라도 다 읽고 판단해. 대체 왜 잘못 판단하고 변경하는거야)
@@ -199,9 +199,13 @@ When multiple providers are enabled, agents use the first available provider in 
 3. **glm_coding** - GLM Coding Plan
 4. **kimi** - Kimi (Moonshot AI)
 5. **kimi_code** - Kimi Code Plan
-6. **openai** - OpenAI
-7. **anthropic** - Anthropic Claude
-8. **google** - Google Gemini
+6. **xiaomi** - Xiaomi MiMo
+7. **xiaomi_token_plan** - Xiaomi MiMo Token Plan
+8. **openrouter** - OpenRouter (100+ models)
+9. **ollama** - Ollama (Local)
+10. **openai** - OpenAI
+11. **anthropic** - Anthropic Claude
+12. **google** - Google Gemini
 
 The system automatically selects the first enabled provider from this list.
 
@@ -219,6 +223,10 @@ Each provider has a default model when selected:
 | glm_coding | GLM-5 |
 | kimi | kimi-k2.5 |
 | kimi_code | kimi-k2.5 |
+| xiaomi | mimo-v2-flash |
+| xiaomi_token_plan | mimo-v2-flash |
+| openrouter | openai/gpt-4o |
+| ollama | llama3.2 |
 
 ## Temperature Settings
 

@@ -1,5 +1,68 @@
 # OutObot Changelog
 
+## 2026-04-30 - OpenRouter & Ollama Providers, GUI Improvements, Agent Delegation Fixes
+
+### Summary
+
+Added OpenRouter and Ollama as new AI providers. Improved GUI with custom model input. Enhanced agent delegation with profile restoration and new event types.
+
+### Changes
+
+**New Providers (`outo/providers.py`):**
+- **OpenRouter**: Access to 100+ models via OpenRouter API (`https://openrouter.ai/api/v1`)
+- **Ollama (Local)**: Local model support via Ollama (`http://localhost:11434/v1`)
+- Both providers use OpenAI-compatible API format
+
+**Agent Role Descriptions (`outo/agents.py`):**
+- Added `role` field to all agents for better clarity in delegation UI
+- OutObot: "Main orchestrator - delegates tasks to appropriate agents"
+- Peritus: "General professional work - handles diverse tasks with expertise"
+- Inquisitor: "Research and investigation specialist"
+- Rimor: "Precise and fast exploration - finds information quickly"
+- Recensor: "Review and verification specialist"
+- Cogitator: "Deep thinking on complex topics"
+- Creativus: "Creative problem solving and ideation"
+- Artifex: "Artistic and design work"
+
+**New Event Types (`outo/server/event_transform.py`, `static/js/events.js`):**
+- `user_message`: Displays user messages in agent conversation flow
+- `summarized`: Shows context summarization events with token count changes
+- `parent_call_id`: Added to `finish` event for proper sub-agent finish filtering
+
+**Agent Delegation Improvements (`static/js/events.js`):**
+- Added call stack tracking (`callStack`) for nested agent delegation
+- `handleFinish()` now uses `parent_call_id` to filter sub-agent finish events
+- `handleAgentCall()` pushes caller to call stack
+- `handleAgentReturn()` pops and restores parent agent bubble
+
+**Server Configuration (`run.py`):**
+- Changed default host from `localhost` to `0.0.0.0` for external network access
+
+**Install Script Improvements (`install.sh`):**
+- Added source file download logic for curl pipe execution
+- Improved file copy and error handling during installation
+
+### Configuration
+
+New provider entries in `providers.json`:
+
+```json
+{
+  "openrouter": {
+    "enabled": false,
+    "api_key": "",
+    "model": "openai/gpt-4o"
+  },
+  "ollama": {
+    "enabled": false,
+    "base_url": "http://localhost:11434/v1",
+    "model": "llama3.2"
+  }
+}
+```
+
+---
+
 ## 2026-04-04 - Fix: First-Time Setup Hint Stale on New Sessions
 
 ### Problem
