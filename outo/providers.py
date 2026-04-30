@@ -141,6 +141,27 @@ class ProviderManager:
                     base_url="https://token-plan-sgp.xiaomimimo.com/anthropic",
                 )
 
+        # OpenRouter
+        if config.get("openrouter", {}).get("enabled"):
+            api_key = config["openrouter"].get("api_key", "")
+            if api_key:
+                self.providers["openrouter"] = Provider(
+                    name="openrouter",
+                    kind="openai",
+                    api_key=api_key,
+                    base_url="https://openrouter.ai/api/v1",
+                )
+
+        # Ollama (Local)
+        if config.get("ollama", {}).get("enabled"):
+            base_url = config["ollama"].get("base_url", "http://localhost:11434/v1")
+            self.providers["ollama"] = Provider(
+                name="ollama",
+                kind="openai",
+                api_key=config["ollama"].get("api_key", "ollama"),
+                base_url=base_url,
+            )
+
     def save_config(self, config: dict):
         self.config_dir.mkdir(parents=True, exist_ok=True)
         with open(self.config_file, "w") as f:
@@ -167,6 +188,8 @@ class ProviderManager:
             "kimi_code": {"enabled": False, "api_key": "", "model": ""},
             "xiaomi": {"enabled": False, "api_key": "", "model": ""},
             "xiaomi_token_plan": {"enabled": False, "api_key": "", "model": ""},
+            "openrouter": {"enabled": False, "api_key": "", "model": ""},
+            "ollama": {"enabled": False, "api_key": "", "base_url": "http://localhost:11434/v1", "model": ""},
         }
 
     def get_model_config(self) -> dict:
@@ -260,5 +283,19 @@ DEFAULT_PROVIDERS = {
         "models": ["mimo-v2-flash", "mimo-v2-pro", "mimo-v2-omni"],
         "url": "https://platform.xiaomimimo.com",
         "base_url": "https://token-plan-sgp.xiaomimimo.com/anthropic",
+    },
+    "openrouter": {
+        "name": "OpenRouter",
+        "kind": "openai",
+        "models": [],
+        "url": "https://openrouter.ai",
+        "base_url": "https://openrouter.ai/api/v1",
+    },
+    "ollama": {
+        "name": "Ollama (Local)",
+        "kind": "openai",
+        "models": [],
+        "url": "https://ollama.com",
+        "base_url": "http://localhost:11434/v1",
     },
 }

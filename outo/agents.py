@@ -61,6 +61,8 @@ class AgentManager:
             "kimi_code": "kimi-k2.5",
             "xiaomi": "mimo-v2-flash",
             "xiaomi_token_plan": "mimo-v2-flash",
+            "openrouter": "openai/gpt-4o",
+            "ollama": "llama3.2",
         }
         return defaults.get(provider, "gpt-5.2")
 
@@ -110,6 +112,8 @@ class AgentManager:
             "openai",
             "anthropic",
             "google",
+            "openrouter",
+            "ollama",
         ]:
             if pname in self.providers:
                 first_provider = self.providers[pname]
@@ -144,6 +148,7 @@ Your long-term memory is managed by outowiki. Use `recall_memory(query)` to sear
 
         self.agents["outo"] = Agent(
             name="outo",
+            role="Main orchestrator - delegates tasks to appropriate agents",
             instructions="You are the main coordinator agent. Your role is to:"
             + skill_info
             + """
@@ -164,6 +169,7 @@ You can delegate to these specialized agents:
 
         self.agents["peritus"] = Agent(
             name="peritus",
+            role="General professional work - handles diverse tasks with expertise",
             instructions="You are a general professional work agent. Handle diverse tasks with expertise and professionalism."
             + skill_info,
             model=model,
@@ -173,6 +179,7 @@ You can delegate to these specialized agents:
 
         self.agents["inquisitor"] = Agent(
             name="inquisitor",
+            role="Research and investigation specialist",
             instructions="You are a research and investigation specialist. Find information, analyze data, and provide detailed research."
             + skill_info,
             model=model,
@@ -182,6 +189,7 @@ You can delegate to these specialized agents:
 
         self.agents["rimor"] = Agent(
             name="rimor",
+            role="Precise and fast exploration - finds information quickly",
             instructions="You are a precise and fast exploration agent. Find information quickly and accurately."
             + skill_info,
             model=model,
@@ -191,6 +199,7 @@ You can delegate to these specialized agents:
 
         self.agents["recensor"] = Agent(
             name="recensor",
+            role="Review and verification specialist",
             instructions="You are a review and verification specialist. Review work, verify facts, and ensure quality."
             + skill_info,
             model=model,
@@ -200,6 +209,7 @@ You can delegate to these specialized agents:
 
         self.agents["cogitator"] = Agent(
             name="cogitator",
+            role="Deep thinking on complex topics",
             instructions="You are a deep thinking specialist. Analyze complex topics thoroughly and provide in-depth analysis."
             + skill_info,
             model=model,
@@ -209,6 +219,7 @@ You can delegate to these specialized agents:
 
         self.agents["creativus"] = Agent(
             name="creativus",
+            role="Creative problem solving and ideation",
             instructions="You are a creative problem solving agent. Generate innovative ideas and creative solutions."
             + skill_info,
             model=model,
@@ -218,6 +229,7 @@ You can delegate to these specialized agents:
 
         self.agents["artifex"] = Agent(
             name="artifex",
+            role="Artistic and design work",
             instructions="You are an artistic and design specialist. Create visually appealing and artistic content."
             + skill_info,
             model=model,
