@@ -112,6 +112,49 @@ context = recall_memory("user's preferred programming language")
 
 ---
 
+### record_to_wiki
+
+Record important discoveries to wiki for future reference.
+
+```python
+@Tool
+def record_to_wiki(
+    content: Annotated[str, "Content to record to wiki. Include key facts, discoveries, or learnings."],
+    category: Annotated[str, "Category/topic for the wiki entry (e.g., 'technology/ai', 'programming/python')"] = "",
+) -> str:
+```
+
+**Parameters:**
+- `content` (string): Content to record to wiki. Include key facts, discoveries, or learnings.
+- `category` (string, optional): Category/topic for the wiki entry.
+
+**Returns:** Confirmation message or error.
+
+**When to use:**
+- Learning a new library or framework usage
+- Solving a complex bug or debugging technique
+- Understanding a new algorithm or data structure
+- Discovering best practices or design patterns
+- User preferences or project-specific knowledge
+- Important technical decisions or tradeoffs
+
+**Example:**
+```python
+# Record a library usage discovery
+result = record_to_wiki(
+    "React useEffect cleanup: Return a function to clean up subscriptions",
+    category="programming/react"
+)
+
+# Record a bug solution
+result = record_to_wiki(
+    "Python GIL workaround: Use multiprocessing instead of threading for CPU-bound tasks",
+    category="programming/python"
+)
+```
+
+---
+
 ## File Upload API
 
 ### POST /api/upload
@@ -182,6 +225,7 @@ DEFAULT_TOOLS = [
     run_bash,
     view_media,
     recall_memory,
+    record_to_wiki,
 ]
 ```
 

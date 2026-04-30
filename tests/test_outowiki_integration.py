@@ -172,21 +172,16 @@ class TestMemoryManagerWithOutowiki:
         return wiki
 
     @pytest.mark.asyncio
-    async def test_get_context_calls_wiki_search(self, tmp_path: Path, mock_wiki):
-        """When outowiki is configured, get_context should call wiki.search
-        and incorporate the returned documents into the final context string."""
+    async def test_get_context_returns_me_content_only(self, tmp_path: Path, mock_wiki):
+        """get_context should return only me.md content. Wiki search uses recall_memory tool."""
         manager = MemoryManager(config_dir=tmp_path)
         manager._outowiki = mock_wiki
         manager._initialized = True
 
-        with patch(
-            "outo.memory._search_result_to_context",
-            return_value="User likes Python.",
-        ) as mock_conv, patch("outo.memory.get_me_content", return_value=None):
+        with patch("outo.memory.get_me_content", return_value="I am test user"):
             result = await manager.get_context()
 
-        mock_wiki.search.assert_awaited_once()
-        assert "User likes Python." in result
+        assert result == "## User Identity (from me.md)\nI am test user"
 
     @pytest.mark.asyncio
     async def test_remember_calls_wiki_record(self, tmp_path: Path, mock_wiki):

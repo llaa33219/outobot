@@ -45,10 +45,11 @@ def recall_memory(
             if results:
                 content_parts = []
                 for r in results:
-                    content_parts.append(r.content if hasattr(r, "content") else str(r))
-                context = "\n\n---\n\n".join(content_parts)
-                if context:
-                    return context
+                    content = r.content if hasattr(r, "content") else str(r)
+                    if content:
+                        content_parts.append(content)
+                if content_parts:
+                    return "\n\n---\n\n".join(content_parts)
         except Exception:
             pass
 
@@ -85,6 +86,38 @@ def recall_memory(
         result += f"... and {len(results) - 10} more"
 
     return result
+
+
+@Tool
+def record_to_wiki(
+    content: Annotated[str, "Content to record to wiki. Include key facts, discoveries, or learnings."],
+    category: Annotated[str, "Category/topic for the wiki entry (e.g., 'technology/ai', 'programming/python')"] = "",
+) -> str:
+    """Record important discoveries to wiki. Use when: learning libraries, solving bugs, understanding algorithms, finding best practices, user preferences, or technical decisions."""
+    if not _memory_manager or not _memory_manager.is_available:
+        return "Wiki not available. Information not recorded."
+
+    try:
+        import threading
+
+        def _do_record():
+            try:
+                metadata = {"type": "agent_discovery"}
+                if category:
+                    metadata["category"] = category
+                result = _memory_manager._outowiki.record(content, metadata=metadata)
+                if result.success:
+                    return f"Recorded to wiki ({result.documents_affected} documents affected)"
+                else:
+                    return f"Recording failed: {result.error}"
+            except Exception as e:
+                return f"Recording failed: {e}"
+
+        thread = threading.Thread(target=_do_record, daemon=True)
+        thread.start()
+        return "Recording to wiki in background..."
+    except Exception as e:
+        return f"Failed to record: {e}"
 
 
 @Tool
@@ -322,4 +355,5 @@ DEFAULT_TOOLS = [
     run_bash,
     view_media,
     recall_memory,
+    record_to_wiki,
 ]

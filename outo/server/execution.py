@@ -270,19 +270,6 @@ class ExecutionManager:
                 internal_queue.put_nowait(event_data)
 
             def on_summarize_callback(info):
-                if memory_manager is not None and memory_manager.is_available:
-                    try:
-                        summarized_content = self._build_summarized_content(info)
-                        memory_manager.remember_summary_async(
-                            content=summarized_content,
-                            agent_name=info.agent_name,
-                            summary=info.summary,
-                            next_steps=info.next_steps,
-                            tokens_before=info.tokens_before,
-                            tokens_after=info.tokens_after,
-                        )
-                    except Exception:
-                        pass
                 event_data = {
                     "type": "summarized",
                     "agent_name": info.agent_name,
@@ -547,17 +534,3 @@ class ExecutionManager:
             self._executions.pop(session_id, None)
             self._subscribers.pop(session_id, None)
             self._tasks.pop(session_id, None)
-
-    def _build_summarized_content(self, info) -> str:
-        parts = [f"# Summarization ({info.agent_name})"]
-        parts.append(f"Tokens: {info.tokens_before} → {info.tokens_after}")
-        parts.append(f"\n## Summary\n{info.summary}")
-        if info.next_steps:
-            parts.append(f"\n## Next Steps\n{info.next_steps}")
-        parts.append(f"\n## Summarized Messages ({len(info.messages_to_summarize)} messages)")
-        for msg in info.messages_to_summarize:
-            role = getattr(msg, "role", "unknown")
-            content = getattr(msg, "content", None) or str(msg)
-            if content:
-                parts.append(f"[{role}] {content[:200]}")
-        return "\n".join(parts)

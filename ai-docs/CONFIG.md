@@ -388,9 +388,12 @@ OutObot uses an intelligent memory system powered by **outowiki** (markdown file
 
 ### How It Works
 
-1. **Storage**: After each conversation, summaries are stored as markdown files in the wiki directory
-2. **Retrieval**: Before each response, relevant past context is retrieved via semantic search using LLM
-3. **Context Injection**: Retrieved memory is prepended as a system message
+1. **System Prompt**: `me.md` content (user identity) is injected via system prompt
+2. **Wiki Search**: Agent uses `recall_memory(query)` tool to search wiki when needed
+3. **Wiki Recording**: 
+   - Automatic: Conversation is stored after each response via `remember_async()`
+   - Manual: Agent uses `record_to_wiki(content, category)` tool for important discoveries
+4. **Context Window**: Only the last 25 messages are included in conversation history
 
 ### Dependencies
 

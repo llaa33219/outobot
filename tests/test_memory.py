@@ -101,26 +101,13 @@ class TestMemoryManagerGetContext:
         assert result == ""
 
     @pytest.mark.asyncio
-    async def test_uses_outowiki_when_available(self, tmp_path: Path):
-        config_file = tmp_path / MEMORY_CONFIG_FILENAME
-        config_file.write_text(json.dumps({"max_results": 5}))
-
+    async def test_returns_me_content_only(self, tmp_path: Path):
         manager = MemoryManager(config_dir=tmp_path)
-        mock_wiki = MagicMock()
-        mock_wiki.search = AsyncMock(return_value=MagicMock(
-            documents=["remembered: user likes Python"]
-        ))
-        manager._initialized = True
-        manager._outowiki = mock_wiki
-
-        msg = MagicMock(content="What languages?", sender="user")
 
         with patch("outo.memory.get_me_content", return_value="I am direct"):
-            result = await manager.get_context(history=[msg])
+            result = await manager.get_context()
 
-        assert "I am direct" in result
-        assert "remembered: user likes Python" in result
-        mock_wiki.search.assert_called_once()
+        assert result == "## User Identity (from me.md)\nI am direct"
 
 
 class TestMemoryManagerRemember:

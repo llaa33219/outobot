@@ -28,7 +28,7 @@ OutObot uses a multi-agent architecture where specialized agents collaborate to 
 
 ## Memory System
 
-OutObot uses an intelligent memory system powered by **outowiki** (markdown files + LLM) for persistent agent memory across conversations. The system automatically stores and retrieves relevant context.
+OutObot uses an intelligent memory system powered by **outowiki** (markdown files + LLM) for persistent agent memory across conversations.
 
 ### Architecture
 
@@ -42,8 +42,8 @@ OutObot uses an intelligent memory system powered by **outowiki** (markdown file
 └─────────────────────────────────────────────────────────────┘
                             │
               ┌─────────────┴─────────────┐
-              │    Memory Context Injection │
-              │  (get_context → system msg) │
+              │    System Prompt Injection │
+              │  (me.md only → identity)   │
               └───────────────────────────┘
 ```
 
@@ -57,33 +57,32 @@ OutObot uses an intelligent memory system powered by **outowiki** (markdown file
 
 ### How It Works
 
-1. **Storage**: After each conversation, `MemoryManager.remember_async()` stores a summary as a markdown file in the wiki directory
+1. **System Prompt**: `MemoryManager.get_context()` returns only `me.md` content (user identity) for system prompt injection
 
-2. **Retrieval**: Before each response, `MemoryManager.get_context()` queries outowiki for relevant past context based on conversation history
+2. **Wiki Search**: Agent uses `recall_memory(query)` tool to search wiki when needed
 
-3. **Context Injection**: Retrieved memory is formatted and prepended as a system message containing:
-   - User identity from `me.md`
-   - Relevant memory context from outowiki
+3. **Wiki Recording**: 
+   - Automatic: `MemoryManager.remember_async()` stores conversation after each response
+   - Manual: Agent uses `record_to_wiki(content, category)` tool for important discoveries
 
-4. **Fallback**: If outowiki is unavailable, falls back to `recall_memory` tool for session-based search
+4. **Context Window Management**: Only the last 25 messages are included in conversation history
 
 ### Memory Manager Methods
 
 #### `get_context(history)`
 
-Retrieves relevant memory context for the current conversation.
+Returns me.md content for system prompt injection.
 
 ```python
 async def get_context(self, history: list[Any] | None = None) -> str
 ```
 
-- Queries outowiki with conversation history
-- Returns formatted context string (user identity + memory)
-- Returns empty string if no relevant context found
+- Returns me.md content formatted as `## User Identity (from me.md)`
+- Returns empty string if me.md is empty or missing
 
 #### `remember_async(history | user_message, assistant_message)`
 
-Stores conversation in memory (non-blocking).
+Stores conversation in memory (non-blocking). Called automatically after each response.
 
 ```python
 def remember_async(
@@ -121,23 +120,32 @@ See [CONFIG.md](CONFIG.md) for full configuration options.
 
 ### Agent Instructions
 
-Agents now receive memory context automatically. The agent instructions include:
+Agents receive me.md content via system prompt and have access to memory tools:
 
 ```
 ## Memory System
 
-Your long-term memory is managed by outowiki. Use `recall_memory(query)` to search past conversations and context. Memory is stored automatically — focus on answering the user, not on note-taking.
+Your long-term memory is managed by outowiki. Use these tools:
+
+- `recall_memory(query)` — Search past conversations and context when you need to recall information
+- `record_to_wiki(content, category)` — Record important discoveries for future reference
+
+**When to record to wiki:**
+- Learning a new library or framework usage (e.g., "React useEffect cleanup patterns")
+- Solving a complex bug or debugging technique (e.g., "Python GIL threading issue workaround")
+- Understanding a new algorithm or data structure (e.g., "B+ tree indexing in databases")
+- Discovering best practices or design patterns (e.g., "Repository pattern for data access")
+- User preferences or project-specific knowledge (e.g., "User prefers dark mode UI")
+- Important technical decisions or tradeoffs (e.g., "Chose PostgreSQL over MongoDB for ACID compliance")
 ```
 
-### Note Files (Legacy Support)
+### Note Files
 
-`me.md` is still used for agent identity and is included in memory context:
+`me.md` is used for agent identity and is injected via system prompt:
 
 | File | Purpose |
 |------|---------|
 | `me.md` | Agent identity: speech style, tone, personality traits |
-
-Other note files (`important.md`, etc.) are deprecated in favor of outowiki but remain accessible via `recall_memory` tool.
 
 ## AgentManager Class
 
@@ -268,7 +276,18 @@ All agents include Memory System documentation in their instructions:
 ```
 ## Memory System
 
-Your long-term memory is managed by outowiki. Use `recall_memory(query)` to search past conversations and context. Memory is stored automatically — focus on answering the user, not on note-taking.
+Your long-term memory is managed by outowiki. Use these tools:
+
+- `recall_memory(query)` — Search past conversations and context when you need to recall information
+- `record_to_wiki(content, category)` — Record important discoveries for future reference
+
+**When to record to wiki:**
+- Learning a new library or framework usage (e.g., "React useEffect cleanup patterns")
+- Solving a complex bug or debugging technique (e.g., "Python GIL threading issue workaround")
+- Understanding a new algorithm or data structure (e.g., "B+ tree indexing in databases")
+- Discovering best practices or design patterns (e.g., "Repository pattern for data access")
+- User preferences or project-specific knowledge (e.g., "User prefers dark mode UI")
+- Important technical decisions or tradeoffs (e.g., "Chose PostgreSQL over MongoDB for ACID compliance")
 ```
 
 ### OutObot (Coordinator) — Full Instructions
@@ -282,7 +301,18 @@ You are the main coordinator agent. Your role is to:
 {dynamically generated list from _build_skills_list()}
 
 ## Memory System
-Your long-term memory is managed by outowiki. Use `recall_memory(query)` to search past conversations and context. Memory is stored automatically — focus on answering the user, not on note-taking.
+Your long-term memory is managed by outowiki. Use these tools:
+
+- `recall_memory(query)` — Search past conversations and context when you need to recall information
+- `record_to_wiki(content, category)` — Record important discoveries for future reference
+
+**When to record to wiki:**
+- Learning a new library or framework usage (e.g., "React useEffect cleanup patterns")
+- Solving a complex bug or debugging technique (e.g., "Python GIL threading issue workaround")
+- Understanding a new algorithm or data structure (e.g., "B+ tree indexing in databases")
+- Discovering best practices or design patterns (e.g., "Repository pattern for data access")
+- User preferences or project-specific knowledge (e.g., "User prefers dark mode UI")
+- Important technical decisions or tradeoffs (e.g., "Chose PostgreSQL over MongoDB for ACID compliance")
 
 You can delegate to these specialized agents:
 - peritus: General professional work

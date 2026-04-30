@@ -220,10 +220,12 @@ class OutobotDiscord:
 
         history = None
         session_messages: list[dict[str, Any]] = []
+        MAX_HISTORY_MESSAGES = 25
         raw_history = load_session(session_id, self.sessions_dir)
         if raw_history:
             history = []
-            for msg in raw_history.get("messages", []):
+            messages = raw_history.get("messages", [])[-MAX_HISTORY_MESSAGES:]
+            for msg in messages:
                 msg_type = "forward" if msg.get("sender") != agent_name else "return"
                 history.append(
                     Message(

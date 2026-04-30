@@ -352,33 +352,11 @@ class MemoryManager:
         return (kind, base_url, api_key, model)
 
     async def get_context(self, history: list[Any] | None = None) -> str:
+        """Return me.md content for system prompt. Wiki search uses recall_memory tool."""
         me_content = get_me_content()
-        wiki_context = ""
-        if await self._try_initialize() and self._outowiki is not None:
-            try:
-                conversation = _history_to_conversation(history)
-                query = ""
-                if conversation:
-                    recent = conversation[-3:]
-                    query_parts = [
-                        msg.get("content", "")
-                        for msg in recent
-                        if msg.get("content")
-                    ]
-                    query = " ".join(query_parts)
-                config = load_memory_config(self._config_dir)
-                max_results = config.get("max_results", 10)
-                result = await self._outowiki.search(
-                    query or "recent",
-                    max_results=max_results,
-                    return_mode="full",
-                )
-                wiki_context = _search_result_to_context(result)
-            except Exception as e:
-                logger.warning("outowiki search failed: %s", e)
-                wiki_context = ""
-
-        return self._format_context(me_content, wiki_context)
+        if not me_content:
+            return ""
+        return "## User Identity (from me.md)\n" + me_content
 
     def _format_context(self, me_content: str | None, wiki_context: str) -> str:
         parts: list[str] = []
@@ -442,41 +420,7 @@ class MemoryManager:
         thread = threading.Thread(target=_do_remember, daemon=True)
         thread.start()
 
-    def remember_summary_async(
-        self,
-        content: str,
-        agent_name: str,
-        summary: str,
-        next_steps: str | None = None,
-        tokens_before: int = 0,
-        tokens_after: int = 0,
-    ) -> None:
-        if self._outowiki is None:
-            return
 
-        def _do_record() -> None:
-            try:
-                result = self._outowiki.record(
-                    content,
-                    metadata={
-                        "type": "summarization",
-                        "agent_name": agent_name,
-                        "tokens_before": tokens_before,
-                        "tokens_after": tokens_after,
-                    },
-                )
-                if result.success:
-                    logger.debug(
-                        "outowiki summarize record completed (%d docs affected)",
-                        result.documents_affected,
-                    )
-                else:
-                    logger.warning("outowiki summarize record failed: %s", result.error)
-            except Exception as e:
-                logger.warning("outowiki summarize record failed: %s", e)
-
-        thread = threading.Thread(target=_do_record, daemon=True)
-        thread.start()
 
     async def reinitialize(self) -> bool:
         async with self._lock:

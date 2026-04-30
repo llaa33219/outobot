@@ -64,11 +64,13 @@ def create_chat_routes(
 
             history = None
             session_messages = []
+            MAX_HISTORY_MESSAGES = 25
             if request.session_id:
                 raw_history = load_session(request.session_id, sessions_dir)
                 if raw_history:
                     history = []
-                    for msg in raw_history.get("messages", []):
+                    messages = raw_history.get("messages", [])[-MAX_HISTORY_MESSAGES:]
+                    for msg in messages:
                         msg_type = (
                             "forward"
                             if msg.get("sender") != request.agent
@@ -198,12 +200,14 @@ def create_chat_routes(
         history = None
         session_id = request.session_id
         session_messages = []
+        MAX_HISTORY_MESSAGES = 25
 
         if session_id:
             raw_history = load_session(session_id, sessions_dir)
             if raw_history:
                 history = []
-                for msg in raw_history.get("messages", []):
+                messages = raw_history.get("messages", [])[-MAX_HISTORY_MESSAGES:]
+                for msg in messages:
                     msg_type = (
                         "forward" if msg.get("sender") != request.agent else "return"
                     )
@@ -511,11 +515,13 @@ def create_chat_routes(
 
                 history = None
                 session_messages = []
+                MAX_HISTORY_MESSAGES = 25
                 if session_id:
                     raw_history = load_session(session_id, sessions_dir)
                     if raw_history:
                         history = []
-                        for msg in raw_history.get("messages", []):
+                        messages = raw_history.get("messages", [])[-MAX_HISTORY_MESSAGES:]
+                        for msg in messages:
                             msg_type = (
                                 "forward"
                                 if msg.get("sender") != agent_name
