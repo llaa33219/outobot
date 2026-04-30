@@ -16,10 +16,18 @@ NC='\033[0m' # No Color
 OUTOBOT_DIR="$HOME/.outobot"
 OUTOBOT_VENV="$OUTOBOT_DIR/venv"
 OUTOBOT_BIN="$OUTOBOT_VENV/bin"
+TEMP_DIR=""
 
 # Version tracking
 VERSION_FILE="$OUTOBOT_DIR/.version"
 CURRENT_VERSION="1.0.0"
+
+cleanup_temp() {
+    if [ -n "$TEMP_DIR" ] && [ -d "$TEMP_DIR" ]; then
+        rm -rf "$TEMP_DIR"
+    fi
+}
+trap cleanup_temp EXIT
 
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}  OutObot Installation${NC}"
@@ -135,32 +143,38 @@ else
 
 # Copy source files to OutObot directory
 copy_source_files() {
-    # Detect if running via pipe (curl | bash)
     if [ -t 0 ]; then
-        # Running directly (stdin is a terminal)
         SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     else
-        # Running via pipe - need to download source files
         echo -e "  Detected pipe execution. Downloading source files..."
-        SCRIPT_DIR=$(mktemp -d)
-        TEMP_DIR="$SCRIPT_DIR"
+        TEMP_DIR=$(mktemp -d)
+        SCRIPT_DIR="$TEMP_DIR"
         
-        # Clone the repository
         if command -v git &> /dev/null; then
-            git clone --depth 1 https://github.com/llaa33219/outobot.git "$SCRIPT_DIR/repo" 2>/dev/null || {
-                echo -e "${RED}ERROR: Failed to download source files.${NC}"
-                echo "Please try: git clone https://github.com/llaa33219/outobot && cd outobot && bash install.sh"
+            echo -e "  Cloning repository..."
+            if ! git clone --depth 1 https://github.com/llaa33219/outobot.git "$TEMP_DIR/repo"; then
+                echo -e "${RED}ERROR: git clone failed.${NC}"
+                echo "Try manually: git clone https://github.com/llaa33219/outobot && cd outobot && bash install.sh"
                 exit 1
-            }
-            SCRIPT_DIR="$SCRIPT_DIR/repo"
+            fi
+            SCRIPT_DIR="$TEMP_DIR/repo"
         else
-            # Fallback: download tarball
-            curl -sL https://github.com/llaa33219/outobot/archive/main.tar.gz | tar xz -C "$SCRIPT_DIR" 2>/dev/null || {
-                echo -e "${RED}ERROR: Failed to download source files.${NC}"
-                echo "Please install git or try: curl -sL https://github.com/llaa33219/outobot/archive/main.tar.gz | tar xz"
+            echo -e "  Downloading tarball..."
+            if ! curl -fsSL https://github.com/llaa33219/outobot/archive/main.tar.gz -o "$TEMP_DIR/source.tar.gz"; then
+                echo -e "${RED}ERROR: Download failed.${NC}"
+                echo "Install git or download manually from: https://github.com/llaa33219/outobot"
                 exit 1
-            }
-            SCRIPT_DIR="$SCRIPT_DIR/outobot-main"
+            fi
+            if ! tar xzf "$TEMP_DIR/source.tar.gz" -C "$TEMP_DIR"; then
+                echo -e "${RED}ERROR: Failed to extract archive.${NC}"
+                exit 1
+            fi
+            SCRIPT_DIR="$TEMP_DIR/outobot-main"
+        fi
+        
+        if [ ! -d "$SCRIPT_DIR" ]; then
+            echo -e "${RED}ERROR: Source directory not found after download.${NC}"
+            exit 1
         fi
     fi
     
@@ -218,11 +232,6 @@ copy_source_files() {
     
     # Ensure note directory exists
     mkdir -p "$OUTOBOT_DIR/note"
-    
-    # Clean up temp directory if we downloaded via pipe
-    if [ -n "$TEMP_DIR" ] && [ -d "$TEMP_DIR" ]; then
-        rm -rf "$TEMP_DIR"
-    fi
     
     echo -e "  Source files ready"
 }
