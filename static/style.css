@@ -2402,6 +2402,29 @@ body {
   transform: translateY(-3px);
 }
 
+.modal-row input[type="text"] {
+  flex: 1;
+  padding: 7px 10px;
+  background: var(--bg-primary);
+  border: 2px solid var(--border);
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-family: inherit;
+  font-weight: 500;
+  outline: none;
+  transition: all var(--transition);
+}
+
+.modal-row input[type="text"]:focus {
+  box-shadow: 3px 3px 0 #000;
+  transform: translateY(-3px);
+}
+
+.modal-row input[type="text"]::placeholder {
+  color: var(--text-muted);
+  font-family: inherit;
+}
+
 .modal-footer {
   display: flex;
   align-items: center;

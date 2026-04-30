@@ -9,6 +9,7 @@ const PROVIDER_KEYS = [
   { name: 'google', inputId: 'googleKeyInput', statusId: 'googleStatus', key: 'google' },
   { name: 'mistral', inputId: 'mistralKeyInput', statusId: 'mistralStatus', key: 'mistral' },
   { name: 'ollama', inputId: 'ollamaKeyInput', statusId: 'ollamaStatus', key: 'ollama' },
+  { name: 'openrouter', inputId: 'openrouterKeyInput', statusId: 'openrouterStatus', key: 'openrouter' },
   { name: 'minimax', inputId: 'minimaxKeyInput', statusId: 'minimaxStatus', key: 'minimax' },
   { name: 'glm', inputId: 'glmKeyInput', statusId: 'glmStatus', key: 'glm' },
   { name: 'glm_coding', inputId: 'glmCodingKeyInput', statusId: 'glmCodingStatus', key: 'glm_coding' },
@@ -79,6 +80,7 @@ class OutObotChat {
     this.sessions = [];
     this.processing = false;
     this._sentAgent = null;
+    this._sentCallId = null;
 
     this.activeAgents = new Set();
     this.involvedAgents = new Set();
@@ -466,6 +468,8 @@ class OutObotChat {
       kimi_code: ['kimi-k2.5', 'kimi-k2.5-thinking', 'kimi-k2'],
       xiaomi: ['mimo-v2-flash', 'mimo-v2-pro', 'mimo-v2-omni'],
       xiaomi_token_plan: ['mimo-v2-flash', 'mimo-v2-pro', 'mimo-v2-omni'],
+      openrouter: [],
+      ollama: [],
     };
     return defaults[providerName] || [];
   }
@@ -479,6 +483,10 @@ class OutObotChat {
     const availableProviders = [];
     
     PROVIDER_KEYS.forEach(({ key, inputId }) => {
+      if (key === 'ollama') {
+        availableProviders.push(key);
+        return;
+      }
       const input = document.getElementById(inputId);
       const apiKey = input?.value?.trim() || '';
       const config = this.providerConfig[key] || {};
@@ -502,7 +510,9 @@ class OutObotChat {
       glm_coding: 'GLM Coding Plan',
       kimi: 'Kimi',
       xiaomi: 'Xiaomi MiMo',
-      xiaomi_token_plan: 'Xiaomi MiMo Token Plan'
+      xiaomi_token_plan: 'Xiaomi MiMo Token Plan',
+      openrouter: 'OpenRouter',
+      ollama: 'Ollama (Local)',
     };
     
     availableProviders.forEach(key => {
@@ -526,10 +536,12 @@ class OutObotChat {
     if (!this.els.defaultModelSelect) return;
     const providerName = this.els.defaultProviderSelect?.value;
     const sel = this.els.defaultModelSelect;
+    const input = document.getElementById('defaultModelInput');
     const currentModel = sel.value;
     sel.innerHTML = '';
     
     const models = this.getProviderModels(providerName);
+    
     models.forEach((m) => {
       const opt = document.createElement('option');
       opt.value = m;
@@ -537,14 +549,49 @@ class OutObotChat {
       sel.appendChild(opt);
     });
     
+    const customOpt = document.createElement('option');
+    customOpt.value = '__custom__';
+    customOpt.textContent = 'Custom...';
+    sel.appendChild(customOpt);
+    
+    sel.classList.remove('hidden');
+    if (input) input.classList.add('hidden');
+    
     const config = this.providerConfig[providerName];
-    if (currentModel && models.includes(currentModel)) {
+    const savedModel = config?.model || '';
+    
+    if (currentModel && currentModel === '__custom__') {
+      sel.value = '__custom__';
+      sel.classList.add('hidden');
+      if (input) {
+        input.classList.remove('hidden');
+        input.value = '';
+      }
+    } else if (savedModel && savedModel !== '__custom__' && !models.includes(savedModel)) {
+      sel.value = '__custom__';
+      sel.classList.add('hidden');
+      if (input) {
+        input.classList.remove('hidden');
+        input.value = savedModel;
+      }
+    } else if (currentModel && models.includes(currentModel)) {
       sel.value = currentModel;
-    } else if (config && config.model && models.includes(config.model)) {
-      sel.value = config.model;
+    } else if (savedModel && models.includes(savedModel)) {
+      sel.value = savedModel;
     } else if (models.length > 0) {
       sel.value = models[0];
     }
+    
+    sel.addEventListener('change', () => {
+      if (sel.value === '__custom__') {
+        sel.classList.add('hidden');
+        if (input) {
+          input.classList.remove('hidden');
+          input.value = '';
+          input.focus();
+        }
+      }
+    });
   }
 
   populateMemoryProviderSelect() {
@@ -563,7 +610,8 @@ class OutObotChat {
       glm_coding: 'GLM Coding Plan',
       kimi: 'Kimi',
       xiaomi: 'Xiaomi MiMo',
-      xiaomi_token_plan: 'Xiaomi MiMo Token Plan'
+      xiaomi_token_plan: 'Xiaomi MiMo Token Plan',
+      openrouter: 'OpenRouter',
     };
 
     PROVIDER_KEYS.forEach(({ key, inputId }) => {
@@ -590,14 +638,50 @@ class OutObotChat {
     if (!this.els.memoryModel) return;
     const providerName = this.els.memoryProvider?.value;
     const sel = this.els.memoryModel;
+    const input = document.getElementById('memoryModelInput');
     sel.innerHTML = '';
 
     const models = this.getProviderModels(providerName);
+    
     models.forEach((m) => {
       const opt = document.createElement('option');
       opt.value = m;
       opt.textContent = m;
       sel.appendChild(opt);
+    });
+    
+    const customOpt = document.createElement('option');
+    customOpt.value = '__custom__';
+    customOpt.textContent = 'Custom...';
+    sel.appendChild(customOpt);
+    
+    sel.classList.remove('hidden');
+    if (input) input.classList.add('hidden');
+    
+    const savedModel = this.memoryConfig?.memory_model || '';
+    
+    if (savedModel && savedModel !== '__custom__' && !models.includes(savedModel)) {
+      sel.value = '__custom__';
+      sel.classList.add('hidden');
+      if (input) {
+        input.classList.remove('hidden');
+        input.value = savedModel;
+      }
+    } else if (savedModel && models.includes(savedModel)) {
+      sel.value = savedModel;
+    } else if (models.length > 0) {
+      sel.value = models[0];
+    }
+    
+    sel.addEventListener('change', () => {
+      if (sel.value === '__custom__') {
+        sel.classList.add('hidden');
+        if (input) {
+          input.classList.remove('hidden');
+          input.value = '';
+          input.focus();
+        }
+      }
     });
   }
 
@@ -627,7 +711,7 @@ class OutObotChat {
   checkWelcomeSetup() {
     if (!this.els.welcomeSetup) return;
     
-    const providerKeys = ['openai', 'anthropic', 'google', 'minimax', 'glm', 'glm_coding', 'kimi', 'xiaomi', 'xiaomi_token_plan'];
+    const providerKeys = ['openai', 'anthropic', 'google', 'minimax', 'glm', 'glm_coding', 'kimi', 'xiaomi', 'xiaomi_token_plan', 'openrouter', 'ollama'];
     const configured = providerKeys.filter(key => {
       const val = this.providerConfig[key];
       return val && (val.api_key || val.enabled);
@@ -851,7 +935,13 @@ class OutObotChat {
   }
 
   ensureAgentBubble(agentName) {
-    if (this.currentBubble) return this.currentBubble;
+    if (this.currentBubble) {
+      const currentAgent = this.currentBubble.dataset.agent;
+      if (currentAgent !== agentName) {
+        this.updateBubbleProfile(agentName);
+      }
+      return this.currentBubble;
+    }
 
     const bubbleData = this.ui.createAgentBubbleElement(agentName);
     this.els.chatArea.appendChild(bubbleData.element);
@@ -860,6 +950,27 @@ class OutObotChat {
     this.currentFinishEl = bubbleData.finishContent;
     this.involvedAgents.add(agentName);
     return this.currentBubble;
+  }
+
+  updateBubbleProfile(agentName) {
+    if (!this.currentBubble) return;
+    const meta = this.chat.agentMeta[agentName] || { icon: '🔆', label: agentName, color: '#6366f1' };
+    
+    this.currentBubble.dataset.agent = agentName;
+    
+    const avatar = this.currentBubble.querySelector('.message-avatar');
+    if (avatar) {
+      avatar.style.background = meta.color || '#6366f1';
+      avatar.textContent = meta.icon || '🔆';
+    }
+    
+    const nameEl = this.currentBubble.querySelector('.message-name');
+    if (nameEl) {
+      nameEl.style.color = meta.color || '#6366f1';
+      nameEl.textContent = meta.label || agentName;
+    }
+    
+    this.involvedAgents.add(agentName);
   }
 
   addMessageTrail() {
@@ -1036,8 +1147,6 @@ class OutObotChat {
     this.loadMemoryConfig().then(() => {
       this.syncMemorySettingsInputs();
     });
-    this.populateMemoryProviderSelect();
-    this.updateMemoryModels();
     if (this.els.apiKeysModal) this.els.apiKeysModal.style.display = 'none';
     if (this.els.modelModal) this.els.modelModal.style.display = 'flex';
     this.els.settingsModalsContainer.classList.remove('hidden');
@@ -1061,6 +1170,14 @@ class OutObotChat {
       const models = this.getProviderModels(memoryProvider);
       if (models.includes(memoryModel)) {
         this.els.memoryModel.value = memoryModel;
+      } else {
+        this.els.memoryModel.value = '__custom__';
+        this.els.memoryModel.classList.add('hidden');
+        const input = document.getElementById('memoryModelInput');
+        if (input) {
+          input.classList.remove('hidden');
+          input.value = memoryModel;
+        }
       }
     }
   }
@@ -1078,9 +1195,23 @@ class OutObotChat {
     if (defaultProvider && this.els.defaultProviderSelect) {
       this.els.defaultProviderSelect.value = defaultProvider;
     }
+    
+    this.updateDefaultModels();
+    
     const defaultModel = this.providerConfig.default_model;
     if (defaultModel && this.els.defaultModelSelect) {
-      this.els.defaultModelSelect.value = defaultModel;
+      const models = this.getProviderModels(defaultProvider);
+      if (models.includes(defaultModel)) {
+        this.els.defaultModelSelect.value = defaultModel;
+      } else {
+        this.els.defaultModelSelect.value = '__custom__';
+        this.els.defaultModelSelect.classList.add('hidden');
+        const input = document.getElementById('defaultModelInput');
+        if (input) {
+          input.classList.remove('hidden');
+          input.value = defaultModel;
+        }
+      }
     }
 
     const discordToken = this.discordConfig.token;
@@ -1118,6 +1249,14 @@ class OutObotChat {
       const models = this.getProviderModels(memoryProvider);
       if (models.includes(memoryModel)) {
         this.els.memoryModel.value = memoryModel;
+      } else {
+        this.els.memoryModel.value = '__custom__';
+        this.els.memoryModel.classList.add('hidden');
+        const input = document.getElementById('memoryModelInput');
+        if (input) {
+          input.classList.remove('hidden');
+          input.value = memoryModel;
+        }
       }
     }
   }
@@ -1180,9 +1319,24 @@ class OutObotChat {
     });
 
     const defaultProvider = this.els.defaultProviderSelect?.value;
-    const defaultModel = this.els.defaultModelSelect?.value;
+    const defaultModelSelect = this.els.defaultModelSelect;
+    const defaultModelInput = document.getElementById('defaultModelInput');
+    let defaultModel = '';
+    
+    if (defaultModelSelect?.value === '__custom__') {
+      defaultModel = defaultModelInput?.value?.trim() || '';
+    } else {
+      defaultModel = defaultModelSelect?.value || '';
+    }
+    
     if (defaultProvider) newConfig.default_provider = defaultProvider;
     if (defaultModel) newConfig.default_model = defaultModel;
+    if (defaultProvider && defaultModel) {
+      if (!newConfig[defaultProvider]) {
+        newConfig[defaultProvider] = { enabled: false, api_key: '', model: '' };
+      }
+      newConfig[defaultProvider].model = defaultModel;
+    }
 
     try {
       const res = await fetch('/api/providers', {
@@ -1222,13 +1376,24 @@ class OutObotChat {
     }
 
     try {
+      const memoryProvider = document.getElementById('memoryProvider')?.value || 'openai';
+      const memoryModelSelect = document.getElementById('memoryModel');
+      const memoryModelInput = document.getElementById('memoryModelInput');
+      let memoryModel = '';
+      
+      if (memoryModelSelect?.value === '__custom__') {
+        memoryModel = memoryModelInput?.value?.trim() || '';
+      } else {
+        memoryModel = memoryModelSelect?.value || '';
+      }
+      
       await fetch('/api/memory/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           enabled: true,
-          provider: document.getElementById('memoryProvider')?.value || 'openai',
-          memory_model: document.getElementById('memoryModel')?.value || '',
+          provider: memoryProvider,
+          memory_model: memoryModel,
           wiki_path: this.memoryConfig.wiki_path || '',
           max_results: this.memoryConfig.max_results || 10
         })
