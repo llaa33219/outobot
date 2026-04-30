@@ -137,6 +137,10 @@ def record_to_wiki(
 - Discovering best practices or design patterns
 - User preferences or project-specific knowledge
 - Important technical decisions or tradeoffs
+- CLI tool usage or command syntax
+- Environment-specific knowledge
+- Failure-to-success process and reasoning
+- Correcting wrong knowledge
 
 **Example:**
 ```python

@@ -130,13 +130,17 @@ Your long-term memory is managed by outowiki. Use these tools:
 - `recall_memory(query)` — Search past conversations and context when you need to recall information
 - `record_to_wiki(content, category)` — Record important discoveries for future reference
 
-**When to record to wiki:**
+**When to record to wiki (if you learned something, record it):**
 - Learning a new library or framework usage (e.g., "React useEffect cleanup patterns")
 - Solving a complex bug or debugging technique (e.g., "Python GIL threading issue workaround")
 - Understanding a new algorithm or data structure (e.g., "B+ tree indexing in databases")
 - Discovering best practices or design patterns (e.g., "Repository pattern for data access")
 - User preferences or project-specific knowledge (e.g., "User prefers dark mode UI")
 - Important technical decisions or tradeoffs (e.g., "Chose PostgreSQL over MongoDB for ACID compliance")
+- CLI tool usage or command syntax (e.g., "ffmpeg -c:v libx264 for H.264 encoding")
+- Environment-specific knowledge (e.g., "Ubuntu 22.04 uses Python 3.10 by default")
+- Failure-to-success process and reasoning (e.g., "Fixed CORS error by adding Access-Control-Allow-Origin header")
+- Correcting wrong knowledge (e.g., "Actually, async/await is syntactic sugar for promises, not threads")
 ```
 
 ### Note Files
@@ -281,13 +285,17 @@ Your long-term memory is managed by outowiki. Use these tools:
 - `recall_memory(query)` — Search past conversations and context when you need to recall information
 - `record_to_wiki(content, category)` — Record important discoveries for future reference
 
-**When to record to wiki:**
+**When to record to wiki (if you learned something, record it):**
 - Learning a new library or framework usage (e.g., "React useEffect cleanup patterns")
 - Solving a complex bug or debugging technique (e.g., "Python GIL threading issue workaround")
 - Understanding a new algorithm or data structure (e.g., "B+ tree indexing in databases")
 - Discovering best practices or design patterns (e.g., "Repository pattern for data access")
 - User preferences or project-specific knowledge (e.g., "User prefers dark mode UI")
 - Important technical decisions or tradeoffs (e.g., "Chose PostgreSQL over MongoDB for ACID compliance")
+- CLI tool usage or command syntax (e.g., "ffmpeg -c:v libx264 for H.264 encoding")
+- Environment-specific knowledge (e.g., "Ubuntu 22.04 uses Python 3.10 by default")
+- Failure-to-success process and reasoning (e.g., "Fixed CORS error by adding Access-Control-Allow-Origin header")
+- Correcting wrong knowledge (e.g., "Actually, async/await is syntactic sugar for promises, not threads")
 ```
 
 ### OutObot (Coordinator) — Full Instructions
@@ -306,13 +314,17 @@ Your long-term memory is managed by outowiki. Use these tools:
 - `recall_memory(query)` — Search past conversations and context when you need to recall information
 - `record_to_wiki(content, category)` — Record important discoveries for future reference
 
-**When to record to wiki:**
+**When to record to wiki (if you learned something, record it):**
 - Learning a new library or framework usage (e.g., "React useEffect cleanup patterns")
 - Solving a complex bug or debugging technique (e.g., "Python GIL threading issue workaround")
 - Understanding a new algorithm or data structure (e.g., "B+ tree indexing in databases")
 - Discovering best practices or design patterns (e.g., "Repository pattern for data access")
 - User preferences or project-specific knowledge (e.g., "User prefers dark mode UI")
 - Important technical decisions or tradeoffs (e.g., "Chose PostgreSQL over MongoDB for ACID compliance")
+- CLI tool usage or command syntax (e.g., "ffmpeg -c:v libx264 for H.264 encoding")
+- Environment-specific knowledge (e.g., "Ubuntu 22.04 uses Python 3.10 by default")
+- Failure-to-success process and reasoning (e.g., "Fixed CORS error by adding Access-Control-Allow-Origin header")
+- Correcting wrong knowledge (e.g., "Actually, async/await is syntactic sugar for promises, not threads")
 
 You can delegate to these specialized agents:
 - peritus: General professional work
