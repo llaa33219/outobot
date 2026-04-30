@@ -135,7 +135,34 @@ else
 
 # Copy source files to OutObot directory
 copy_source_files() {
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    # Detect if running via pipe (curl | bash)
+    if [ -t 0 ]; then
+        # Running directly (stdin is a terminal)
+        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    else
+        # Running via pipe - need to download source files
+        echo -e "  Detected pipe execution. Downloading source files..."
+        SCRIPT_DIR=$(mktemp -d)
+        TEMP_DIR="$SCRIPT_DIR"
+        
+        # Clone the repository
+        if command -v git &> /dev/null; then
+            git clone --depth 1 https://github.com/llaa33219/outobot.git "$SCRIPT_DIR/repo" 2>/dev/null || {
+                echo -e "${RED}ERROR: Failed to download source files.${NC}"
+                echo "Please try: git clone https://github.com/llaa33219/outobot && cd outobot && bash install.sh"
+                exit 1
+            }
+            SCRIPT_DIR="$SCRIPT_DIR/repo"
+        else
+            # Fallback: download tarball
+            curl -sL https://github.com/llaa33219/outobot/archive/main.tar.gz | tar xz -C "$SCRIPT_DIR" 2>/dev/null || {
+                echo -e "${RED}ERROR: Failed to download source files.${NC}"
+                echo "Please install git or try: curl -sL https://github.com/llaa33219/outobot/archive/main.tar.gz | tar xz"
+                exit 1
+            }
+            SCRIPT_DIR="$SCRIPT_DIR/outobot-main"
+        fi
+    fi
     
     # Check if this is an update (existing installation)
     IS_UPDATE=false
@@ -191,6 +218,11 @@ copy_source_files() {
     
     # Ensure note directory exists
     mkdir -p "$OUTOBOT_DIR/note"
+    
+    # Clean up temp directory if we downloaded via pipe
+    if [ -n "$TEMP_DIR" ] && [ -d "$TEMP_DIR" ]; then
+        rm -rf "$TEMP_DIR"
+    fi
     
     echo -e "  Source files ready"
 }
