@@ -114,7 +114,7 @@ context = recall_memory("user's preferred programming language")
 
 ### record_to_wiki
 
-Record important discoveries to wiki for future reference.
+Record anything you learn to wiki.
 
 ```python
 @Tool
@@ -130,7 +130,7 @@ def record_to_wiki(
 
 **Returns:** Confirmation message or error.
 
-**When to use:**
+**When to use (if you learned something, record it - no matter how small):**
 - Learning a new library or framework usage
 - Solving a complex bug or debugging technique
 - Understanding a new algorithm or data structure
@@ -141,6 +141,7 @@ def record_to_wiki(
 - Environment-specific knowledge
 - Failure-to-success process and reasoning
 - Correcting wrong knowledge
+- Anything new you discovered during the conversation
 
 **Example:**
 ```python

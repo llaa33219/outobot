@@ -402,20 +402,31 @@ class MemoryManager:
             return
 
         def _do_remember() -> None:
-            try:
-                result = self._outowiki.record(
-                    record_content,
-                    metadata={"type": "conversation"},
-                )
-                if result.success:
-                    logger.debug(
-                        "outowiki record completed (%d docs affected)",
-                        result.documents_affected,
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    result = self._outowiki.record(
+                        record_content,
+                        metadata={"type": "conversation"},
                     )
-                else:
-                    logger.warning("outowiki record failed: %s", result.error)
-            except Exception as e:
-                logger.warning("outowiki record failed: %s", e)
+                    if result.success:
+                        logger.debug(
+                            "outowiki record completed (%d docs affected)",
+                            result.documents_affected,
+                        )
+                        return
+                    else:
+                        if attempt < max_retries - 1:
+                            import time
+                            time.sleep(1)
+                            continue
+                        logger.warning("outowiki record failed: %s", result.error)
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        import time
+                        time.sleep(1)
+                        continue
+                    logger.warning("outowiki record failed: %s", e)
 
         thread = threading.Thread(target=_do_remember, daemon=True)
         thread.start()

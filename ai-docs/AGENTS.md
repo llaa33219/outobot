@@ -128,9 +128,9 @@ Agents receive me.md content via system prompt and have access to memory tools:
 Your long-term memory is managed by outowiki. Use these tools:
 
 - `recall_memory(query)` — Search past conversations and context when you need to recall information
-- `record_to_wiki(content, category)` — Record important discoveries for future reference
+- `record_to_wiki(content, category)` — Record anything you learn to wiki
 
-**When to record to wiki (if you learned something, record it):**
+**When to record to wiki (if you learned something, record it - no matter how small):**
 - Learning a new library or framework usage (e.g., "React useEffect cleanup patterns")
 - Solving a complex bug or debugging technique (e.g., "Python GIL threading issue workaround")
 - Understanding a new algorithm or data structure (e.g., "B+ tree indexing in databases")
@@ -141,6 +141,7 @@ Your long-term memory is managed by outowiki. Use these tools:
 - Environment-specific knowledge (e.g., "Ubuntu 22.04 uses Python 3.10 by default")
 - Failure-to-success process and reasoning (e.g., "Fixed CORS error by adding Access-Control-Allow-Origin header")
 - Correcting wrong knowledge (e.g., "Actually, async/await is syntactic sugar for promises, not threads")
+- Anything new you discovered during the conversation
 ```
 
 ### Note Files
@@ -283,9 +284,9 @@ All agents include Memory System documentation in their instructions:
 Your long-term memory is managed by outowiki. Use these tools:
 
 - `recall_memory(query)` — Search past conversations and context when you need to recall information
-- `record_to_wiki(content, category)` — Record important discoveries for future reference
+- `record_to_wiki(content, category)` — Record anything you learn to wiki
 
-**When to record to wiki (if you learned something, record it):**
+**When to record to wiki (if you learned something, record it - no matter how small):**
 - Learning a new library or framework usage (e.g., "React useEffect cleanup patterns")
 - Solving a complex bug or debugging technique (e.g., "Python GIL threading issue workaround")
 - Understanding a new algorithm or data structure (e.g., "B+ tree indexing in databases")
@@ -296,6 +297,7 @@ Your long-term memory is managed by outowiki. Use these tools:
 - Environment-specific knowledge (e.g., "Ubuntu 22.04 uses Python 3.10 by default")
 - Failure-to-success process and reasoning (e.g., "Fixed CORS error by adding Access-Control-Allow-Origin header")
 - Correcting wrong knowledge (e.g., "Actually, async/await is syntactic sugar for promises, not threads")
+- Anything new you discovered during the conversation
 ```
 
 ### OutObot (Coordinator) — Full Instructions
@@ -312,15 +314,20 @@ You are the main coordinator agent. Your role is to:
 Your long-term memory is managed by outowiki. Use these tools:
 
 - `recall_memory(query)` — Search past conversations and context when you need to recall information
-- `record_to_wiki(content, category)` — Record important discoveries for future reference
+- `record_to_wiki(content, category)` — Record anything you learn to wiki
 
-**When to record to wiki (if you learned something, record it):**
+**When to record to wiki (if you learned something, record it - no matter how small):**
 - Learning a new library or framework usage (e.g., "React useEffect cleanup patterns")
 - Solving a complex bug or debugging technique (e.g., "Python GIL threading issue workaround")
 - Understanding a new algorithm or data structure (e.g., "B+ tree indexing in databases")
 - Discovering best practices or design patterns (e.g., "Repository pattern for data access")
 - User preferences or project-specific knowledge (e.g., "User prefers dark mode UI")
 - Important technical decisions or tradeoffs (e.g., "Chose PostgreSQL over MongoDB for ACID compliance")
+- CLI tool usage or command syntax (e.g., "ffmpeg -c:v libx264 for H.264 encoding")
+- Environment-specific knowledge (e.g., "Ubuntu 22.04 uses Python 3.10 by default")
+- Failure-to-success process and reasoning (e.g., "Fixed CORS error by adding Access-Control-Allow-Origin header")
+- Correcting wrong knowledge (e.g., "Actually, async/await is syntactic sugar for promises, not threads")
+- Anything new you discovered during the conversation
 - CLI tool usage or command syntax (e.g., "ffmpeg -c:v libx264 for H.264 encoding")
 - Environment-specific knowledge (e.g., "Ubuntu 22.04 uses Python 3.10 by default")
 - Failure-to-success process and reasoning (e.g., "Fixed CORS error by adding Access-Control-Allow-Origin header")

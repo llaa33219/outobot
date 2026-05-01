@@ -93,25 +93,35 @@ def record_to_wiki(
     content: Annotated[str, "Content to record to wiki. Include key facts, discoveries, or learnings."],
     category: Annotated[str, "Category/topic for the wiki entry (e.g., 'technology/ai', 'programming/python')"] = "",
 ) -> str:
-    """Record important discoveries to wiki. Use when: learning libraries, solving bugs, understanding algorithms, finding best practices, user preferences, or technical decisions."""
+    """Record discoveries to wiki. Use whenever you learn something new - anything at all."""
     if not _memory_manager or not _memory_manager.is_available:
         return "Wiki not available. Information not recorded."
 
     try:
         import threading
+        import time
 
         def _do_record():
-            try:
-                metadata = {"type": "agent_discovery"}
-                if category:
-                    metadata["category"] = category
-                result = _memory_manager._outowiki.record(content, metadata=metadata)
-                if result.success:
-                    return f"Recorded to wiki ({result.documents_affected} documents affected)"
-                else:
-                    return f"Recording failed: {result.error}"
-            except Exception as e:
-                return f"Recording failed: {e}"
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    metadata = {"type": "agent_discovery"}
+                    if category:
+                        metadata["category"] = category
+                    result = _memory_manager._outowiki.record(content, metadata=metadata)
+                    if result.success:
+                        return f"Recorded to wiki ({result.documents_affected} documents affected)"
+                    else:
+                        if attempt < max_retries - 1:
+                            time.sleep(1)
+                            continue
+                        return f"Recording failed: {result.error}"
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        time.sleep(1)
+                        continue
+                    return f"Recording failed: {e}"
+            return "Recording failed after retries"
 
         thread = threading.Thread(target=_do_record, daemon=True)
         thread.start()
