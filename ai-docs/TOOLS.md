@@ -130,6 +130,8 @@ def record_to_wiki(
 
 **Returns:** Confirmation message or error.
 
+**Retry Logic:** Automatically retries up to 3 times with 1-second delay on failure.
+
 **When to use (if you learned something, record it - no matter how small):**
 - Learning a new library or framework usage
 - Solving a complex bug or debugging technique
